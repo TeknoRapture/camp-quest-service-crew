@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 82 122">
+  <ellipse cx="41" cy="119" rx="20" ry="3" fill="#17351f" opacity=".3"/>
+  <rect x="35" y="91" width="12" height="29" fill="#765035" stroke="#4a3020" stroke-width="2"/>
+  <rect x="3" y="3" width="76" height="94" rx="7" fill="#fff" stroke="#171717" stroke-width="5"/>
+  <g fill="#e11919" font-family="Arial, sans-serif" font-weight="900" text-anchor="middle"><text x="41" y="29" font-size="17">Beware</text><text x="41" y="47" font-size="15">of</text><text x="41" y="67" font-size="19">Cliff!</text></g>
+  <g fill="none" stroke="#e11919" stroke-width="2"><rect x="26" y="73" width="30" height="17"/><circle cx="41" cy="81.5" r="7"/><path d="M41 75l7 12H34z"/></g><circle cx="41" cy="81.5" r="2" fill="#e11919"/>
+</svg>
