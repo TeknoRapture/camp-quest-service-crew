@@ -2,7 +2,7 @@
 
 A small, mobile-first retro camp adventure built as a static browser game. The morning bell has rung, but Service Crew cannot start until somebody solves the ancient mystery: **who took the mop?**
 
-This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue, collision, hazards, supply pickups, a delivery, a Service Checklist, Energy, Service Points, a saved best score, and a blocked bridge teasing the Back 40. It also includes an incremental sprite pipeline with shape-drawing fallbacks and reusable image inspection overlays.
+This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue, collision, hazards, supply pickups, a delivery, a Service Checklist, Energy, Service Points, a saved best score, and a blocked bridge teasing the Back 40. It also includes an incremental SVG sprite pipeline with shape-drawing fallbacks and reusable image inspection overlays.
 
 ## Play
 
