@@ -1,28 +1,53 @@
 # Camp Quest: Service Crew
 
-This is an experimental project for testing OpenAI Codex Cloud.
+A small, mobile-first retro camp adventure built as a static browser game. The morning bell has rung, but Service Crew cannot start until somebody solves the ancient mystery: **who took the mop?**
 
-Goal:
-Create a small static browser game that can be built and deployed without AWS.
+This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue, collision, hazards, supply pickups, a delivery, a Service Checklist, Energy, Service Points, a saved best score, and a blocked bridge teasing the Back 40.
 
-Game concept:
-Game concept:
-A retro top-down 2D adventure game set at Brigade Camp at Stony Glen. The player is part of Service Crew. When the morning bell rings, Service Crew starts the day by finding supplies, cleaning shower houses, finding even more supplies, restocking bathrooms, taking out trash, and delivering supplies around camp while avoiding various hazards.
+## Play
 
-Style:
-- Retro top-down 2D adventure
-- 16-bit-inspired, not strict 8-bit
-- Warm outdoorsy camp colors
-- Funny, wholesome, Christian, service-focused, lightly mysterious
-- Client-side only
-- No login
-- No database
-- No backend server
+- **Phone:** use the on-screen D-pad and large **ACTION** button.
+- **Desktop:** move with WASD or arrow keys; interact with Space or E.
+- Talk to Coop by the Welcome Center, recover supplies, and deliver the crate to the Dining Hall.
+- Mud and wet floors slow movement. Mosquito clouds reduce Energy.
 
-Preferred stack:
-- Vite
-- TypeScript
-- HTML Canvas
+## Setup and development
 
-First major Codex task:
-Create the initial working game project, including build scripts, README instructions, and GitHub Pages deployment.
+Requires Node.js 20 or newer.
+
+```bash
+npm install
+npm run dev
+```
+
+Open the local URL printed by Vite.
+
+## Build and preview
+
+```bash
+npm run build
+npm run preview
+```
+
+The production-ready static site is generated in `dist/`.
+
+## Deploy to GitHub Pages
+
+The workflow at `.github/workflows/deploy-pages.yml` builds and deploys the game whenever changes are pushed to `main`, or when manually started from the Actions tab.
+
+1. In the GitHub repository, open **Settings → Pages**.
+2. Set **Source** to **GitHub Actions**.
+3. Push to `main` or run the deployment workflow manually.
+
+No backend, accounts, database, or AWS services are required. The best Service Points score is stored in browser `localStorage`.
+
+## Project structure
+
+- `src/main.ts` — game state, input, update loop, interactions, and canvas rendering.
+- `src/style.css` — responsive mobile-first game shell, HUD, checklist, dialogue, and controls.
+- `public/reference/` — supplied visual references for the Stony Glen layout and Cliff sign.
+- `.github/workflows/deploy-pages.yml` — static GitHub Pages deployment.
+
+## Expanding the game
+
+The foundation intentionally uses straightforward data arrays for buildings, NPCs, supplies, hazards, and checklist tasks. Future days can add more objects and interactions without introducing a large generic game engine. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.
