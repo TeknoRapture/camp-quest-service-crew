@@ -24,6 +24,15 @@
         </aside>
         <div id="dialogue" class="dialogue hidden"><b id="speaker"></b><p id="dialogue-text"></p><small>Tap ACTION to continue</small></div>
         <div id="toast" class="toast hidden"></div>
+        <div id="image-inspection" class="image-inspection hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
+          <figure class="inspection-card">
+            <button id="close-inspection" class="inspection-close" aria-label="Close image inspection">×</button>
+            <h2 id="inspection-title"></h2>
+            <img id="inspection-image" alt="" />
+            <div id="inspection-fallback" class="inspection-fallback hidden" role="img" aria-label="Image unavailable placeholder">Image unavailable</div>
+            <figcaption id="inspection-caption"></figcaption>
+          </figure>
+        </div>
       </div>
       <section class="controls" aria-label="Touch controls">
         <div class="dpad">

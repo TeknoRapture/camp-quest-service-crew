@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 74 110">
+  <rect x="31" y="84" width="12" height="26" fill="#765035"/><rect x="2" y="2" width="70" height="88" rx="2" fill="#fffdf3" stroke="#241f1b" stroke-width="4"/>
+  <g fill="#d73832" font-family="Arial, sans-serif" font-weight="700" text-anchor="middle"><text x="37" y="24" font-size="15">BEWARE</text><text x="37" y="40" font-size="12">of</text><text x="37" y="57" font-size="16">CLIFF!</text></g>
+  <g fill="none" stroke="#d73832" stroke-width="2"><rect x="24" y="64" width="26" height="18"/><circle cx="37" cy="73" r="7"/><path d="M37 66l7 12H30z"/></g><circle cx="37" cy="73" r="2" fill="#d73832"/>
+</svg>
