@@ -2,7 +2,7 @@
 
 A small, mobile-first retro camp adventure built as a static browser game. The morning bell has rung, but Service Crew cannot start until somebody solves the ancient mystery: **who took the mop?**
 
-This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue, collision, hazards, supply pickups, a delivery, a Service Checklist, Energy, Service Points, a saved best score, and a blocked bridge teasing the Back 40. It also includes an incremental SVG sprite pipeline with shape-drawing fallbacks and reusable image inspection overlays.
+This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue with reusable portraits, collision, hazards, supply pickups, a delivery, a Service Checklist, Energy, Service Points, a saved best score, and a blocked bridge teasing the Back 40. It also includes an incremental SVG sprite pipeline with shape-drawing fallbacks and reusable image inspection overlays.
 
 ## Play
 
@@ -53,4 +53,4 @@ No backend, accounts, database, or AWS services are required. The best Service P
 
 ## Expanding the game
 
-The foundation intentionally uses straightforward data arrays for buildings, NPCs, supplies, hazards, and checklist tasks. To convert another object to a sprite, add its path to `assetPaths`, preload it, and call `drawSprite` before its existing fallback drawing. The reusable inspection overlay can similarly display maps, notes, schedules, labels, and other image clues. Future days can add more objects and interactions without introducing a large generic game engine. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.
+The foundation intentionally uses straightforward data arrays for buildings, NPCs, supplies, hazards, and checklist tasks. To convert another object to a sprite, add its path to `assetPaths`, preload it, and call `drawSprite` before its existing fallback drawing. NPC dialogue metadata can define a display name, accent color, and an emotion-ready portrait set; NPCs without a custom portrait use the generic fallback. The reusable inspection overlay can similarly display maps, notes, schedules, labels, and other image clues. Future days can add more objects and interactions without introducing a large generic game engine. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.
