@@ -41,7 +41,7 @@ const cliffSign: Thing = { id:'cliffSign', label:'Beware of Cliff!', x:1175, y:3
 const npcs: NPC[] = [
   { id:'coop',label:'Coop',x:290,y:570,w:28,h:34,lines:['Morning bell rang! Service Crew is ready. Unfortunately, the supplies are not.','Find the missing mop, broom, gloves, and trash bags. Service Crew Rule #1: the thing you need is never where it belongs.'] },
   { id:'ethan',label:'Ethan',x:585,y:415,w:28,h:34,lines:['Program borrowed a supply crate for a skit. We returned... a different crate?','Bring a crate from the Supply Shed to the Dining Hall when you find one.'] },
-  { id:'greggerwy',label:'Greggerwy',x:470,y:300,w:28,h:34,lines:['Camp readiness report: cheerful, promising, and currently missing one mop.','Finish the checklist and report to the Rally Circle!'] },
+  { id:'gweggowy',label:'Gweggowy',x:470,y:300,w:28,h:34,lines:['Camp readiness report: cheerful, promising, and currently missing one mop.','Finish the checklist and report to the Rally Circle!'] },
   { id:'crazyjoe',label:'Crazy Joe',x:1130,y:325,w:28,h:34,lines:['The Back 40 is not ready for Service Crew... yet. Nature Skills training starts another day!','Until then, respect the wildlife and never challenge a vulture to a staring contest.'] },
   { id:'cliff',label:'Cliff?',x:1370,y:250,w:28,h:34,lines:['...','A shadow slips deeper into the Back 40.'] },
 ];
