@@ -4,7 +4,9 @@ import { drawSprite } from './sprites';
 
 type Rect = { x: number; y: number; w: number; h: number };
 type Thing = Rect & { id: string; label: string; color?: string; done?: boolean };
-type NPC = Thing & { lines: string[] };
+type PortraitSet = { default?: string; happy?: string; serious?: string; surprised?: string };
+type DialogueSpeaker = { displayName?: string; label?: string; accent?: string; portraits?: PortraitSet };
+type NPC = Thing & DialogueSpeaker & { lines: string[] };
 type Hazard = Thing & { kind: 'mud' | 'mosquitoes' | 'wet' };
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
@@ -14,7 +16,8 @@ assets.loadAll();
 const ui = {
   objective: document.querySelector('#objective')!, energy: document.querySelector<HTMLElement>('#energy-bar')!,
   points: document.querySelector('#points')!, best: document.querySelector('#best')!, tasks: document.querySelector('#tasks')!,
-  dialogue: document.querySelector('#dialogue')!, speaker: document.querySelector('#speaker')!, text: document.querySelector('#dialogue-text')!,
+  dialogue: document.querySelector<HTMLElement>('#dialogue')!, speaker: document.querySelector('#speaker')!, text: document.querySelector('#dialogue-text')!,
+  portraitPanel: document.querySelector('#portrait-panel')!, portrait: document.querySelector<HTMLImageElement>('#dialogue-portrait')!,
   toast: document.querySelector('#toast')!, checklist: document.querySelector('#checklist')!,
   inspection: document.querySelector('#image-inspection')!, inspectionImage: document.querySelector<HTMLImageElement>('#inspection-image')!,
   inspectionTitle: document.querySelector('#inspection-title')!, inspectionCaption: document.querySelector('#inspection-caption')!,
@@ -38,12 +41,13 @@ const buildings: Thing[] = [
 ];
 const obstacles: Rect[] = [...buildings, {x:1260,y:0,w:35,h:1000}, {x:1250,y:390,w:250,h:28}];
 const cliffSign: Thing = { id:'cliffSign', label:'Beware of Cliff!', x:1175, y:300, w:74, h:110 };
+const GENERIC_NPC_PORTRAIT = 'assets/portraits/generic-npc-portrait.png';
 const npcs: NPC[] = [
-  { id:'coop',label:'Coop',x:290,y:570,w:28,h:34,lines:['Morning bell rang! Service Crew is ready. Unfortunately, the supplies are not.','Find the missing mop, broom, gloves, and trash bags. Service Crew Rule #1: the thing you need is never where it belongs.'] },
-  { id:'ethan',label:'Ethan',x:585,y:415,w:28,h:34,lines:['Program borrowed a supply crate for a skit. We returned... a different crate?','Bring a crate from the Supply Shed to the Dining Hall when you find one.'] },
-  { id:'gweggowy',label:'Gweggowy',x:470,y:300,w:28,h:34,lines:['Camp readiness report: cheerful, promising, and currently missing one mop.','Finish the checklist and report to the Rally Circle!'] },
-  { id:'crazyjoe',label:'Crazy Joe',x:1130,y:325,w:28,h:34,lines:['The Back 40 is not ready for Service Crew... yet. Nature Skills training starts another day!','Until then, respect the wildlife and never challenge a vulture to a staring contest.'] },
-  { id:'cliff',label:'Cliff?',x:1370,y:250,w:28,h:34,lines:['...','A shadow slips deeper into the Back 40.'] },
+  { id:'coop',label:'Coop',displayName:'Coop',accent:'#a43f28',portraits:{default:'assets/portraits/coop-npc-portrait.png'},x:290,y:570,w:28,h:34,lines:['Morning bell rang! Service Crew is ready. Unfortunately, the supplies are not.','Find the missing mop, broom, gloves, and trash bags. Service Crew Rule #1: the thing you need is never where it belongs.'] },
+  { id:'ethan',label:'Ethan',displayName:'Ethan',accent:'#386d95',x:585,y:415,w:28,h:34,lines:['Program borrowed a supply crate for a skit. We returned... a different crate?','Bring a crate from the Supply Shed to the Dining Hall when you find one.'] },
+  { id:'gweggowy',label:'Gweggowy',displayName:'Gweggowy',accent:'#80552a',x:470,y:300,w:28,h:34,lines:['Camp readiness report: cheerful, promising, and currently missing one mop.','Finish the checklist and report to the Rally Circle!'] },
+  { id:'crazyjoe',label:'Crazy Joe',displayName:'Crazy Joe',accent:'#cf6f38',x:1130,y:325,w:28,h:34,lines:['The Back 40 is not ready for Service Crew... yet. Nature Skills training starts another day!','Until then, respect the wildlife and never challenge a vulture to a staring contest.'] },
+  { id:'cliff',label:'Cliff?',displayName:'Cliff?',accent:'#684f78',x:1370,y:250,w:28,h:34,lines:['...','A shadow slips deeper into the Back 40.'] },
 ];
 const supplies: Thing[] = [
   {id:'mop',label:'Mop',x:620,y:570,w:22,h:26},{id:'broom',label:'Broom',x:890,y:790,w:22,h:26},
@@ -67,7 +71,14 @@ function refreshUI() {
   const best = Number(localStorage.getItem('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
   ui.objective.textContent = objective(); ui.tasks.innerHTML = taskDefs.map(([id,label])=>`<li class="${isDone(id)?'done':''}">${label}</li>`).join('');
 }
-function showDialogue(speaker:string, text:string) { dialogueOpen=true; ui.speaker.textContent=speaker; ui.text.textContent=text; ui.dialogue.classList.remove('hidden'); }
+function showDialogue(speaker:DialogueSpeaker, text:string) {
+  const displayName=speaker.displayName ?? speaker.label ?? 'Camp Staff';
+  dialogueOpen=true; ui.speaker.textContent=displayName; ui.text.textContent=text;
+  ui.dialogue.style.setProperty('--dialogue-accent', speaker.accent ?? '#a43f28');
+  ui.dialogue.classList.remove('portrait-missing'); ui.portraitPanel.classList.remove('hidden'); ui.portrait.alt=`Portrait of ${displayName}`;
+  ui.portrait.onerror=()=>{ui.dialogue.classList.add('portrait-missing');ui.portraitPanel.classList.add('hidden');ui.portrait.removeAttribute('src');};
+  ui.portrait.src=speaker.portraits?.default ?? GENERIC_NPC_PORTRAIT; ui.dialogue.classList.remove('hidden');
+}
 function closeDialogue(){ dialogueOpen=false; ui.dialogue.classList.add('hidden'); }
 function inspectImage(title:string, assetId:AssetId, caption:string){
   inspectionOpen=true; keys.clear(); ui.inspectionTitle.textContent=title; ui.inspectionCaption.textContent=caption;
@@ -86,7 +97,7 @@ function interact(){
   if(dialogueOpen){closeDialogue();return;}
   if(dist(player,cliffSign)<100){inspectImage('Beware of Cliff!', 'cliffSignInspection', 'Someone scratched a strange symbol beneath the warning. Beyond it, misplaced crates block the bridge to the Back 40.');return;}
   const npc=npcs.filter(n=>n.id!=='cliff').sort((a,b)=>dist(player,a)-dist(player,b))[0];
-  if(npc&&dist(player,npc)<80){ if(npc.id==='coop'&&!state.talked){state.talked=true;award(25);} showDialogue(npc.label,npc.lines[state.talked?1:0]);return; }
+  if(npc&&dist(player,npc)<80){ if(npc.id==='coop'&&!state.talked){state.talked=true;award(25);} showDialogue(npc,npc.lines[state.talked?1:0]);return; }
   const item=supplies.filter(s=>!s.done).sort((a,b)=>dist(player,a)-dist(player,b))[0];
   if(item&&dist(player,item)<70){item.done=true;state.inventory.push(item.id);award(50);toast(`${item.label} recovered! +50 SP`);refreshUI();return;}
   if(intersects(player,{x:350,y:430,w:250,h:180})&&state.inventory.includes('crate')&&!state.delivered){state.delivered=true;state.inventory=state.inventory.filter(i=>i!=='crate');award(100);toast('Crate delivered! +100 SP');refreshUI();return;}
@@ -121,4 +132,4 @@ addEventListener('keydown',e=>{if(keyMap[e.key]){keys.add(keyMap[e.key]);e.preve
 document.querySelectorAll<HTMLButtonElement>('[data-dir]').forEach(b=>{const dir=b.dataset.dir!;const on=(e:Event)=>{e.preventDefault();keys.add(dir);b.classList.add('pressed')},off=()=>{keys.delete(dir);b.classList.remove('pressed')};b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off)});
 document.querySelector('#close-inspection')!.addEventListener('click',closeInspection);ui.inspection.addEventListener('click',e=>{if(e.target===ui.inspection)closeInspection();});
 document.querySelector('#action-button')!.addEventListener('pointerdown',e=>{e.preventDefault();actionQueued=true});document.querySelector('#checklist-button')!.addEventListener('click',()=>ui.checklist.classList.toggle('open'));document.querySelector('#close-checklist')!.addEventListener('click',()=>ui.checklist.classList.remove('open'));
-showDialogue('Coop', 'Morning bell! Find me by the Welcome Center. The supplies have apparently begun their annual migration.');refreshUI();requestAnimationFrame(loop);
+showDialogue(npcs[0], 'Morning bell! Find me by the Welcome Center. The supplies have apparently begun their annual migration.');refreshUI();requestAnimationFrame(loop);

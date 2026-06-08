@@ -22,7 +22,16 @@
           <button id="close-checklist" aria-label="Close checklist">×</button>
           <h2>Service Checklist</h2><p>DAY 1 · MAIN CAMP</p><ul id="tasks"></ul>
         </aside>
-        <div id="dialogue" class="dialogue hidden"><b id="speaker"></b><p id="dialogue-text"></p><small>Tap ACTION to continue</small></div>
+        <div id="dialogue" class="dialogue hidden" role="dialog" aria-live="polite">
+          <div id="portrait-panel" class="portrait-panel">
+            <img id="dialogue-portrait" alt="" />
+          </div>
+          <div class="dialogue-copy">
+            <b id="speaker"></b>
+            <p id="dialogue-text"></p>
+            <small>Tap ACTION to continue</small>
+          </div>
+        </div>
         <div id="toast" class="toast hidden"></div>
         <div id="image-inspection" class="image-inspection hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
           <figure class="inspection-card">
