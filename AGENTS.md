@@ -147,7 +147,7 @@ The blocked bridge should make the world feel larger without requiring the full 
 
 - Cooper / “Coop”: Service Crew Director. Main checklist giver and service task supervisor.
 - Crazy Joe: Nature Program Director and Outdoor Challenge leader. Teaches Nature Skills and oversees the Back 40 / Outdoor Challenge territory.
-- Greggerwy: Camp Director. Tracks overall camp readiness and unlocks the final rally objective.
+- Gweggowy: Camp Director. Tracks overall camp readiness and unlocks the final rally objective.
 - Ethan: Camp Program Director. Gives program setup and supply delivery quests.
 - Cliff: BBEG tied to the camp ghost story and the Cliff area. Refine later.
 
@@ -275,7 +275,7 @@ Avoid mean-spirited humor. The comedy should come from camp chaos, missing suppl
 - Use Service Points as the score
 - Use Energy as the health/stamina meter
 - Save best score to localStorage
-- Include placeholder NPCs for Coop, Crazy Joe, Greggerwy, Ethan, and Cliff
+- Include placeholder NPCs for Coop, Crazy Joe, Gweggowy, Ethan, and Cliff
 - Include a readable “Beware of Cliff!” sign near the Cliff Trail / Back 40 area, based on a supplied picture
 - Support using a supplied map picture as the visual reference for the camp layout
 
@@ -373,7 +373,7 @@ Back 40 gameplay for later expansion:
 11. Crazy Joe mentions the Back 40 and Nature Skills, but the bridge is blocked for Day 1.
 12. Player sees or interacts with the blocked bridge and/or the “Beware of Cliff!” sign, based on the supplied picture.
 13. Player completes the checklist and reaches the rally circle.
-14. Greggerwy confirms camp readiness.
+14. Gweggowy confirms camp readiness.
 15. Cliff mystery is foreshadowed for later expansion.
 
 ## UI expectations
@@ -437,7 +437,7 @@ Back 40 / Outdoor Challenge:
 
 - Cooper / “Coop”: Service Crew Director. Main checklist giver and service task supervisor.
 - Crazy Joe: Nature Program Director and Outdoor Challenge leader. Teaches Nature Skills.
-- Greggerwy: Camp Director. Tracks overall camp readiness and unlocks final rally objective.
+- Gweggowy: Camp Director. Tracks overall camp readiness and unlocks final rally objective.
 - Ethan: Camp Program Director. Gives program setup and supply delivery quests.
 - Cliff: BBEG tied to the camp ghost story and the Cliff area. Refine later.
 
