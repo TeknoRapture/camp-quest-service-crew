@@ -24,6 +24,8 @@ export interface InteractableDefinition extends Thing {
   message?: string;
   targetMapId?: string;
   targetSpawnId?: string;
+  /** Open exits can transition on overlap; omitted or action exits remain available for gated doors. */
+  activation?: 'automatic' | 'action';
 }
 export interface HazardDefinition extends Thing {
   kind: 'mud' | 'mosquitoes' | 'wet' | 'water' | 'snake' | 'mouse' | 'raccoon';
