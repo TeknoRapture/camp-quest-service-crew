@@ -1,7 +1,8 @@
 export const assetPaths = {
   player: 'assets/player.svg',
   cliffSign: 'assets/cliff-sign.svg',
-  mop: 'assets/mop.svg',
+  blueMop: 'assets/blue-mop.svg',
+  greenMop: 'assets/green-mop.svg',
   broom: 'assets/broom.svg',
   gloves: 'assets/gloves.svg',
   trashBags: 'assets/trash-bags.svg',
