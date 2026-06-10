@@ -44,8 +44,8 @@ const cliffSign: Thing = { id:'cliffSign', label:'Beware of Cliff!', x:1175, y:3
 const GENERIC_NPC_PORTRAIT = 'assets/portraits/generic-npc-portrait.png';
 const npcs: NPC[] = [
   { id:'coop',label:'Coop',displayName:'Coop',accent:'#a43f28',portraits:{default:'assets/portraits/coop-npc-portrait.png'},x:290,y:570,w:28,h:34,lines:['Morning bell rang! Service Crew is ready. Unfortunately, the supplies are not.','Find the missing mop, broom, gloves, and trash bags. Service Crew Rule #1: the thing you need is never where it belongs.'] },
-  { id:'ethan',label:'Ethan',displayName:'Ethan',accent:'#386d95',x:585,y:415,w:28,h:34,lines:['Program borrowed a supply crate for a skit. We returned... a different crate?','Bring a crate from the Supply Shed to the Dining Hall when you find one.'] },
-  { id:'gweggowy',label:'Gweggowy',displayName:'Gweggowy',accent:'#80552a',x:470,y:300,w:28,h:34,lines:['Camp readiness report: cheerful, promising, and currently missing one mop.','Finish the checklist and report to the Rally Circle!'] },
+  { id:'ethan',label:'Ethan',displayName:'Ethan',accent:'#386d95',portraits:{default:'assets/portraits/ethan-npc-portrait.png'},x:585,y:415,w:28,h:34,lines:['Program borrowed a supply crate for a skit. We returned... a different crate?','Bring a crate from the Supply Shed to the Dining Hall when you find one.'] },
+  { id:'gweggowy',label:'Gweggowy',displayName:'Gweggowy',accent:'#80552a',portraits:{default:'assets/portraits/gweggowy-npc-portrait.png'},x:470,y:300,w:28,h:34,lines:['Camp readiness report: cheerful, promising, and currently missing one mop.','Finish the checklist and report to the Rally Circle!'] },
   { id:'crazyjoe',label:'Crazy Joe',displayName:'Crazy Joe',accent:'#cf6f38',x:1130,y:325,w:28,h:34,lines:['The Back 40 is not ready for Service Crew... yet. Nature Skills training starts another day!','Until then, respect the wildlife and never challenge a vulture to a staring contest.'] },
   { id:'cliff',label:'Cliff?',displayName:'Cliff?',accent:'#684f78',x:1370,y:250,w:28,h:34,lines:['...','A shadow slips deeper into the Back 40.'] },
 ];
