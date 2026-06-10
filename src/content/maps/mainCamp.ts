@@ -36,7 +36,7 @@ export const mainCamp: MapDefinition = {
   exits: [
     {
       id: 'showerHouseEntrance', kind: 'map-exit', label: 'Enter Shower House',
-      x: 878, y: 590, w: 48, h: 35, targetMapId: 'showerHouse', targetSpawnId: 'entrance',
+      x: 878, y: 570, w: 48, h: 55, targetMapId: 'showerHouse', targetSpawnId: 'entrance', activation: 'automatic',
     },
   ],
   npcs,
@@ -52,6 +52,6 @@ export const mainCamp: MapDefinition = {
   ],
   spawns: [
     { id: 'start', x: 475, y: 760 },
-    { id: 'showerHouseDoor', x: 890, y: 635 },
+    { id: 'showerHouseDoor', x: 890, y: 650 },
   ],
 };

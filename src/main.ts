@@ -27,7 +27,7 @@ const start = currentMap.spawns.find(({ id }) => id === 'start')!;
 const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, points: 0 };
 const camera = { x: 0, y: 0 };
 const keys = new Set<string>();
-let actionQueued = false, dialogueOpen = true, inspectionOpen = false, toastTimer = 0, hazardTick = 0;
+let actionQueued = false, dialogueOpen = true, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 const state = { talked: false, inventory: [] as string[], delivered: false };
 const allItems = Object.values(maps).flatMap(map => map.items);
 
@@ -65,14 +65,20 @@ function switchMap(exit: InteractableDefinition) {
   const nextMap = exit.targetMapId ? maps[exit.targetMapId] : undefined;
   const spawn = nextMap?.spawns.find(({ id }) => id === exit.targetSpawnId);
   if (!nextMap || !spawn) { toast('That route is not ready yet.'); return; }
-  currentMap = nextMap; player.x = spawn.x; player.y = spawn.y; keys.clear();
+  currentMap = nextMap; player.x = spawn.x; player.y = spawn.y; keys.clear(); transitionCooldown = .45;
   camera.x = 0; camera.y = 0; toast(`Entered ${currentMap.displayName}`); refreshUI();
+}
+function tryAutomaticExit() {
+  if (transitionCooldown > 0) return false;
+  const exit = currentMap.exits.find(candidate => candidate.activation === 'automatic' && intersects(player, candidate));
+  if (!exit) return false;
+  switchMap(exit); return true;
 }
 function interact() {
   if (inspectionOpen) { closeInspection(); return; }
   if (dialogueOpen) { closeDialogue(); return; }
 
-  const nearbyExit = currentMap.exits.find(exit => dist(player, exit) < 85);
+  const nearbyExit = currentMap.exits.find(exit => exit.activation !== 'automatic' && dist(player, exit) < 85);
   if (nearbyExit) { switchMap(nearbyExit); return; }
   const nearbyInteractable = [...currentMap.interactables].sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (nearbyInteractable && dist(player, nearbyInteractable) < 105) {
@@ -101,10 +107,12 @@ function move(dx: number, dy: number) {
   player.x = Math.max(5, Math.min(currentMap.size.w - player.w - 5, player.x)); player.y = Math.max(5, Math.min(currentMap.size.h - player.h - 5, player.y));
 }
 function update(dt: number) {
+  transitionCooldown = Math.max(0, transitionCooldown - dt);
   if (actionQueued) { actionQueued = false; interact(); }
   if (dialogueOpen || inspectionOpen) return;
   const x = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0), y = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0); const len = Math.hypot(x, y) || 1;
   const hazard = currentMap.hazards.find(item => intersects(player, item)); const speed = player.speed * (hazard && hazard.kind !== 'mosquitoes' ? .55 : 1); move(x / len * speed * dt, y / len * speed * dt);
+  if (tryAutomaticExit()) return;
   hazardTick -= dt; if (hazard?.kind === 'mosquitoes' && hazardTick <= 0) { player.energy = Math.max(0, player.energy - 4); hazardTick = .5; toast('Mosquito cloud! Energy -4'); refreshUI(); }
   camera.x = Math.max(0, Math.min(Math.max(0, currentMap.size.w - canvas.width), player.x - canvas.width / 2));
   camera.y = Math.max(0, Math.min(Math.max(0, currentMap.size.h - canvas.height), player.y - canvas.height / 2));
@@ -129,7 +137,6 @@ function draw() {
   if (currentMap.terrainStyle === 'interior') { ctx.fillStyle = '#665448'; currentMap.walls.forEach(wall => ctx.fillRect(wall.x, wall.y, wall.w, wall.h)); }
   currentMap.hazards.forEach(hazard => { if (hazard.assetId && drawSprite(ctx, assets, hazard.assetId, hazard)) { text(hazard.label, hazard.x + hazard.w / 2, hazard.y - 5, 10, '#e9dcaf'); return; } ctx.globalAlpha = .7; ctx.fillStyle = hazard.kind === 'mud' ? '#69553c' : hazard.kind === 'wet' || hazard.kind === 'water' ? '#68a9c7' : '#738044'; ctx.beginPath(); ctx.ellipse(hazard.x + hazard.w / 2, hazard.y + hazard.h / 2, hazard.w / 2, hazard.h / 2, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; });
   currentMap.buildings.forEach(drawBuilding);
-  currentMap.exits.forEach(exit => { ctx.fillStyle = '#e8c47b'; ctx.fillRect(exit.x, exit.y, exit.w, exit.h); text(exit.label, exit.x + exit.w / 2, exit.y + exit.h + 14, 10, '#fff3ae'); });
   const bridge = currentMap.interactables.find(({ id }) => id === 'blockedBridgeMessage'); if (bridge) { ctx.fillStyle = '#6d4b2f'; ctx.fillRect(bridge.x + 35, bridge.y + 35, 70, 95); ctx.fillStyle = '#d65b38'; for (let i = 0; i < 4; i++) ctx.fillRect(bridge.x + 40 + i * 18, bridge.y + 40, 9, 85); text('BRIDGE CLOSED · DAY 1', bridge.x + bridge.w / 2, bridge.y + bridge.h + 14, 12, '#ffd76d'); }
   const cliffSign = currentMap.interactables.find(({ id }) => id === 'cliffSign'); if (cliffSign && !drawSprite(ctx, assets, 'cliffSign', cliffSign)) { ctx.fillStyle = '#fff'; ctx.fillRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.strokeRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); text('BEWARE', cliffSign.x + 37, cliffSign.y + 21, 10, '#e33'); text('of', cliffSign.x + 37, cliffSign.y + 38, 9, '#e33'); text('CLIFF!', cliffSign.x + 37, cliffSign.y + 57, 11, '#e33'); }
   currentMap.interactables.filter(({ kind }) => kind === 'task-location').forEach(spot => { ctx.strokeStyle = '#f8e278'; ctx.lineWidth = 4; ctx.strokeRect(spot.x, spot.y, spot.w, spot.h); text(spot.label, spot.x + spot.w / 2, spot.y - 8, 10, '#fff3ae'); });
