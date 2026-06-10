@@ -8,7 +8,7 @@ This initial playable foundation includes a canvas-rendered Main Camp, touch and
 
 - **Phone:** use the on-screen D-pad and large **ACTION** button.
 - **Desktop:** move with WASD or arrow keys; interact with Space or E.
-- Talk to Coop by the Welcome Center, recover supplies, and deliver the crate to the Dining Hall.
+- Talk to Coop by the Welcome Center, recover supplies, deliver the crate to the Dining Hall, and use Action at the Shower House door to explore the proof-of-concept interior.
 - Mud, wet floors, water, and camp creatures slow movement. Mosquito clouds reduce Energy.
 
 ## Setup and development
@@ -61,11 +61,14 @@ Static game content lives in `src/content/` so future changes can add or edit co
 - `items.ts` controls collectible tools and supplies.
 - `interactables.ts` controls signs, inspection objects, and interaction zones.
 - `hazards.ts` controls terrain and wildlife hazards.
-- `locations.ts` controls named buildings and other map objects.
-- `types.ts` contains the shared TypeScript interfaces for content data.
+- `locations.ts` controls named outdoor buildings and other map objects.
+- `maps/mainCamp.ts` composes the intentionally arranged outdoor map, terrain, zones, placements, collision, and Shower House entrance.
+- `maps/showerHouse.ts` defines the first small interior, including its walls, wet-floor hazard, cleaning spot, and exit.
+- `maps/index.ts` registers maps available to the lightweight map switcher.
+- `types.ts` contains the shared TypeScript interfaces for content and map data.
 
-Future Codex tasks should add game content through these files when possible instead of hardcoding new content into engine or gameplay logic.
+Future Codex tasks should add game content through these files when possible instead of hardcoding it into the gameplay loop. To add another interior, define a readable `MapDefinition`, register it in `maps/index.ts`, and pair indoor/outdoor `map-exit` interactables with matching spawn IDs.
 
 ## Expanding the game
 
-The foundation intentionally uses straightforward data arrays for buildings, NPCs, supplies, hazards, and checklist tasks. To convert another object to a sprite, add its path to `assetPaths` and assign its `assetId` in the relevant item or hazard content entry; the shared renderer keeps the existing shape fallback available. NPC dialogue metadata can define a display name, accent color, and an emotion-ready portrait set; NPCs without a custom portrait use the generic fallback. The reusable inspection overlay can similarly display maps, notes, schedules, labels, and other image clues. Future days can add more objects and interactions without introducing a large generic game engine. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.
+The foundation intentionally uses straightforward data arrays for maps, terrain, buildings, NPCs, supplies, hazards, and checklist tasks. To convert another object to a sprite, add its path to `assetPaths` and assign its `assetId` in the relevant item or hazard content entry; the shared renderer keeps the existing shape fallback available. NPC dialogue metadata can define a display name, accent color, and an emotion-ready portrait set; NPCs without a custom portrait use the generic fallback. The reusable inspection overlay can similarly display maps, notes, schedules, labels, and other image clues. Future days can add more objects and interactions without introducing a large generic game engine. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.
