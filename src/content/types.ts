@@ -43,7 +43,9 @@ export interface TaskDefinition {
   label: string;
 }
 
-export interface ItemDefinition extends Thing {}
+export interface ItemDefinition extends Thing {
+  assetId?: AssetId;
+}
 
 export interface InteractableDefinition extends Thing {
   kind: 'inspection' | 'delivery-zone';
@@ -53,7 +55,8 @@ export interface InteractableDefinition extends Thing {
 }
 
 export interface HazardDefinition extends Thing {
-  kind: 'mud' | 'mosquitoes' | 'wet';
+  kind: 'mud' | 'mosquitoes' | 'wet' | 'water' | 'snake' | 'mouse' | 'raccoon';
+  assetId?: AssetId;
 }
 
 export interface LocationDefinition extends Thing {}
