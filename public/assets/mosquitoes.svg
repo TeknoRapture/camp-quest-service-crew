@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 70">
-  <g fill="#35382d" stroke="#d8d6a4" stroke-width="1.5">
-    <g transform="translate(22 20) rotate(-15)"><ellipse cx="0" cy="0" rx="6" ry="3"/><ellipse cx="-5" cy="-5" rx="7" ry="3" fill="#c5d7bc" fill-opacity=".7"/><ellipse cx="5" cy="-5" rx="7" ry="3" fill="#c5d7bc" fill-opacity=".7"/><path d="M6 0h12"/></g>
-    <g transform="translate(63 18) rotate(18)"><ellipse cx="0" cy="0" rx="6" ry="3"/><ellipse cx="-5" cy="-5" rx="7" ry="3" fill="#c5d7bc" fill-opacity=".7"/><ellipse cx="5" cy="-5" rx="7" ry="3" fill="#c5d7bc" fill-opacity=".7"/><path d="M6 0h12"/></g>
-    <g transform="translate(48 48) rotate(-8)"><ellipse cx="0" cy="0" rx="6" ry="3"/><ellipse cx="-5" cy="-5" rx="7" ry="3" fill="#c5d7bc" fill-opacity=".7"/><ellipse cx="5" cy="-5" rx="7" ry="3" fill="#c5d7bc" fill-opacity=".7"/><path d="M6 0h12"/></g>
-    <g transform="translate(82 49) rotate(25)"><ellipse cx="0" cy="0" rx="5" ry="2.5"/><ellipse cx="-4" cy="-4" rx="6" ry="2.5" fill="#c5d7bc" fill-opacity=".7"/><ellipse cx="4" cy="-4" rx="6" ry="2.5" fill="#c5d7bc" fill-opacity=".7"/><path d="M5 0h10"/></g>
+  <path d="M8 35c0-19 24-30 41-20C67 3 94 17 90 38c9 13-7 27-26 23-15 10-37 2-39-9C14 54 5 47 8 35z" fill="#61734f" fill-opacity=".3" stroke="#83976a" stroke-width="2" stroke-dasharray="4 5"/>
+  <g fill="#30352d" stroke="#253029" stroke-width="1.5" stroke-linecap="round">
+    <g transform="translate(24 23) rotate(-15)"><ellipse rx="6" ry="3"/><ellipse cx="-5" cy="-6" rx="7" ry="3" fill="#dcead5" fill-opacity=".8"/><ellipse cx="5" cy="-6" rx="7" ry="3" fill="#dcead5" fill-opacity=".8"/><path d="M5 0h14M-3 2l-7 8m13-8 7 8"/></g>
+    <g transform="translate(66 20) rotate(18)"><ellipse rx="6" ry="3"/><ellipse cx="-5" cy="-6" rx="7" ry="3" fill="#dcead5" fill-opacity=".8"/><ellipse cx="5" cy="-6" rx="7" ry="3" fill="#dcead5" fill-opacity=".8"/><path d="M5 0h14M-3 2l-7 8m13-8 7 8"/></g>
+    <g transform="translate(49 49) rotate(-8)"><ellipse rx="6" ry="3"/><ellipse cx="-5" cy="-6" rx="7" ry="3" fill="#dcead5" fill-opacity=".8"/><ellipse cx="5" cy="-6" rx="7" ry="3" fill="#dcead5" fill-opacity=".8"/><path d="M5 0h14M-3 2l-7 8m13-8 7 8"/></g>
   </g>
 </svg>
