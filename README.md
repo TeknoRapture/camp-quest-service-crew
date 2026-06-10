@@ -9,7 +9,7 @@ This initial playable foundation includes a canvas-rendered Main Camp, touch and
 - **Phone:** use the on-screen D-pad and large **ACTION** button.
 - **Desktop:** move with WASD or arrow keys; interact with Space or E.
 - Talk to Coop by the Welcome Center, recover supplies, and deliver the crate to the Dining Hall.
-- Mud and wet floors slow movement. Mosquito clouds reduce Energy.
+- Mud, wet floors, water, and camp creatures slow movement. Mosquito clouds reduce Energy.
 
 ## Setup and development
 
@@ -46,7 +46,7 @@ No backend, accounts, database, or AWS services are required. The best Service P
 - `src/main.ts` — game state, input, update loop, interactions, and canvas rendering.
 - `src/assets.ts` — reusable loader and public asset catalog; failed or pending images leave the canvas fallbacks in place.
 - `src/sprites.ts` — reusable canvas sprite drawing helper.
-- `public/assets/` — game-ready SVG sprites loaded at runtime; supplied inspection images remain in `public/reference/`.
+- `public/assets/` — game-ready, text-based SVG sprites for supplies, terrain, hazards, and creatures; supplied inspection images remain in `public/reference/`.
 - `src/style.css` — responsive mobile-first game shell, HUD, checklist, dialogue, and controls.
 - `public/reference/` — supplied visual references for the Stony Glen layout and Cliff sign.
 - `.github/workflows/deploy-pages.yml` — static GitHub Pages deployment.
@@ -68,4 +68,4 @@ Future Codex tasks should add game content through these files when possible ins
 
 ## Expanding the game
 
-The foundation intentionally uses straightforward data arrays for buildings, NPCs, supplies, hazards, and checklist tasks. To convert another object to a sprite, add its path to `assetPaths`, preload it, and call `drawSprite` before its existing fallback drawing. NPC dialogue metadata can define a display name, accent color, and an emotion-ready portrait set; NPCs without a custom portrait use the generic fallback. The reusable inspection overlay can similarly display maps, notes, schedules, labels, and other image clues. Future days can add more objects and interactions without introducing a large generic game engine. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.
+The foundation intentionally uses straightforward data arrays for buildings, NPCs, supplies, hazards, and checklist tasks. To convert another object to a sprite, add its path to `assetPaths` and assign its `assetId` in the relevant item or hazard content entry; the shared renderer keeps the existing shape fallback available. NPC dialogue metadata can define a display name, accent color, and an emotion-ready portrait set; NPCs without a custom portrait use the generic fallback. The reusable inspection overlay can similarly display maps, notes, schedules, labels, and other image clues. Future days can add more objects and interactions without introducing a large generic game engine. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.
