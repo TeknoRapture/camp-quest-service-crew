@@ -45,6 +45,9 @@ export interface TaskDefinition {
 
 export interface ItemDefinition extends Thing {
   assetId?: AssetId;
+  description?: string;
+  /** Future-ready cleaning rule metadata; the current pickup-only gameplay does not enforce item use. */
+  useRestriction?: 'bathroom-only' | 'normal-floor-only';
 }
 
 export interface InteractableDefinition extends Thing {

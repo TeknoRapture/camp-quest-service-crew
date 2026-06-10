@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 42" role="img" aria-labelledby="title description">
+  <title id="title">Green floor mop</title>
+  <desc id="description">A wooden mop with a clearly green mop head for normal-floor-only cleaning.</desc>
+  <path d="M22 3 12 29" stroke="#754827" stroke-width="4" stroke-linecap="round"/>
+  <path d="m20 4 2-2 3 2-2 3z" fill="#e5a43b"/>
+  <path d="M8 27h12l5 11H3z" fill="#72c77b" stroke="#285d36" stroke-width="2" stroke-linejoin="round"/>
+  <path d="m8 31-2 7m6-7-1 8m5-8 1 8m3-8 3 7" stroke="#dcf5d3" stroke-width="2" stroke-linecap="round"/>
+  <path d="M7 28h14" stroke="#348c48" stroke-width="3"/>
+</svg>
