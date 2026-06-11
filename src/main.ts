@@ -129,29 +129,52 @@ function drawTerrain(feature: TerrainFeature) {
   if (feature.kind === 'tile') { ctx.strokeStyle = '#a9b5a6'; ctx.lineWidth = 2; for (let x = feature.x; x < feature.x + feature.w; x += 40) for (let y = feature.y; y < feature.y + feature.h; y += 40) ctx.strokeRect(x, y, 40, 40); }
   if (feature.label) text(feature.label, feature.x + feature.w / 2, feature.y + 20, 11, '#f8edc9');
 }
-function drawBuilding(building: LocationDefinition) {
-  ctx.fillStyle = building.color ?? '#a96e3e'; ctx.fillRect(building.x, building.y, building.w, building.h); ctx.fillStyle = '#4d2e20'; ctx.beginPath();
-  ctx.moveTo(building.x - 10, building.y); ctx.lineTo(building.x + building.w / 2, building.y - 38); ctx.lineTo(building.x + building.w + 10, building.y); ctx.fill();
+function drawBuildingBody(building: LocationDefinition) {
+  ctx.fillStyle = building.color ?? '#a96e3e'; ctx.fillRect(building.x, building.y, building.w, building.h);
   ctx.fillStyle = '#e8c47b';
   const door = building.doorway;
   if (door?.side === 'bottom') { const depth = door.depth ?? 40; ctx.fillRect(building.x + door.offset, building.y + building.h - depth, door.width, depth); }
   else ctx.fillRect(building.x + building.w / 2 - 15, building.y + building.h - 40, 30, 40);
   text(building.label, building.x + building.w / 2, building.y + building.h + 18, 12);
 }
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save(); ctx.translate(-camera.x, -camera.y); ctx.fillStyle = currentMap.background; ctx.fillRect(0, 0, currentMap.size.w, currentMap.size.h);
+function drawBuildingRoof(building: LocationDefinition) {
+  ctx.fillStyle = '#4d2e20'; ctx.beginPath();
+  ctx.moveTo(building.x - 10, building.y); ctx.lineTo(building.x + building.w / 2, building.y - 38); ctx.lineTo(building.x + building.w + 10, building.y); ctx.fill();
+  ctx.fillRect(building.x - 10, building.y - 3, building.w + 20, 7);
+}
+function drawGroundBackground() {
+  ctx.fillStyle = currentMap.background; ctx.fillRect(0, 0, currentMap.size.w, currentMap.size.h);
+}
+function drawTerrainDecor() {
   currentMap.terrain.forEach(drawTerrain);
   if (currentMap.terrainStyle === 'outdoor') for (let x = 45; x < currentMap.size.w; x += 95) for (let y = 55; y < currentMap.size.h; y += 130) if (![...currentMap.buildings, ...currentMap.walls].some(obstacle => intersects({ x: x - 20, y: y - 25, w: 40, h: 55 }, obstacle)) && !currentMap.terrain.some(feature => feature.kind !== 'woods' && intersects({ x: x - 20, y: y - 25, w: 40, h: 55 }, feature)) && ((x + y) % 4 !== 0)) drawTree(x, y);
   if (currentMap.terrainStyle === 'interior') { ctx.fillStyle = '#665448'; currentMap.walls.forEach(wall => ctx.fillRect(wall.x, wall.y, wall.w, wall.h)); }
-  currentMap.hazards.forEach(hazard => { if (hazard.assetId && drawSprite(ctx, assets, hazard.assetId, hazard)) { text(hazard.label, hazard.x + hazard.w / 2, hazard.y - 5, 10, '#e9dcaf'); return; } ctx.globalAlpha = .7; ctx.fillStyle = hazard.kind === 'mud' ? '#69553c' : hazard.kind === 'wet' || hazard.kind === 'water' ? '#68a9c7' : '#738044'; ctx.beginPath(); ctx.ellipse(hazard.x + hazard.w / 2, hazard.y + hazard.h / 2, hazard.w / 2, hazard.h / 2, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; });
-  currentMap.buildings.forEach(drawBuilding);
+}
+function drawBelowActors() {
+  currentMap.buildings.forEach(drawBuildingBody);
   const bridge = currentMap.interactables.find(({ id }) => id === 'blockedBridgeMessage'); if (bridge) { ctx.fillStyle = '#6d4b2f'; ctx.fillRect(bridge.x + 35, bridge.y + 35, 70, 95); ctx.fillStyle = '#d65b38'; for (let i = 0; i < 4; i++) ctx.fillRect(bridge.x + 40 + i * 18, bridge.y + 40, 9, 85); text('BRIDGE CLOSED · DAY 1', bridge.x + bridge.w / 2, bridge.y + bridge.h + 14, 12, '#ffd76d'); }
   const cliffSign = currentMap.interactables.find(({ id }) => id === 'cliffSign'); if (cliffSign && !drawSprite(ctx, assets, 'cliffSign', cliffSign)) { ctx.fillStyle = '#fff'; ctx.fillRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.strokeRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); text('BEWARE', cliffSign.x + 37, cliffSign.y + 21, 10, '#e33'); text('of', cliffSign.x + 37, cliffSign.y + 38, 9, '#e33'); text('CLIFF!', cliffSign.x + 37, cliffSign.y + 57, 11, '#e33'); }
   currentMap.interactables.filter(({ kind }) => kind === 'task-location').forEach(spot => { ctx.strokeStyle = '#f8e278'; ctx.lineWidth = 4; ctx.strokeRect(spot.x, spot.y, spot.w, spot.h); text(spot.label, spot.x + spot.w / 2, spot.y - 8, 10, '#fff3ae'); });
+}
+function drawActors() {
+  currentMap.hazards.forEach(hazard => { if (hazard.assetId && drawSprite(ctx, assets, hazard.assetId, hazard)) { text(hazard.label, hazard.x + hazard.w / 2, hazard.y - 5, 10, '#e9dcaf'); return; } ctx.globalAlpha = .7; ctx.fillStyle = hazard.kind === 'mud' ? '#69553c' : hazard.kind === 'wet' || hazard.kind === 'water' ? '#68a9c7' : '#738044'; ctx.beginPath(); ctx.ellipse(hazard.x + hazard.w / 2, hazard.y + hazard.h / 2, hazard.w / 2, hazard.h / 2, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; });
   currentMap.items.filter(({ done }) => !done).forEach(item => { if (item.assetId && drawSprite(ctx, assets, item.assetId, item)) { text(item.label, item.x + item.w / 2, item.y - 6, 10, '#fff3ae'); return; } ctx.fillStyle = item.id === 'crate' ? '#c58a45' : '#ffe16b'; ctx.fillRect(item.x, item.y, item.w, item.h); });
   currentMap.npcs.forEach(npc => { ctx.fillStyle = npc.id === 'cliff' ? '#342c43' : npc.id === 'crazyjoe' ? '#cf6f38' : '#386d95'; ctx.beginPath(); ctx.arc(npc.x + npc.w / 2, npc.y + 10, 10, 0, 7); ctx.fill(); ctx.fillRect(npc.x, npc.y + 18, npc.w, npc.h - 18); text(npc.label, npc.x + npc.w / 2, npc.y - 7, 11, npc.id === 'cliff' ? '#b8a5c7' : '#fff'); });
-  if (!drawSprite(ctx, assets, 'player', player, { width: 24, height: 38, offsetY: 4 })) { ctx.fillStyle = '#edb13d'; ctx.beginPath(); ctx.arc(player.x + 12, player.y + 9, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#d95637'; ctx.fillRect(player.x, player.y + 18, 24, 12); } text('YOU', player.x + 12, player.y - 6, 10, '#fff'); ctx.restore();
+  if (!drawSprite(ctx, assets, 'player', player, { width: 24, height: 38, offsetY: 4 })) { ctx.fillStyle = '#edb13d'; ctx.beginPath(); ctx.arc(player.x + 12, player.y + 9, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#d95637'; ctx.fillRect(player.x, player.y + 18, 24, 12); } text('YOU', player.x + 12, player.y - 6, 10, '#fff');
 }
+function drawAboveActors() {
+  if (currentMap.terrainStyle === 'outdoor') currentMap.buildings.forEach(drawBuildingRoof);
+}
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save(); ctx.translate(-camera.x, -camera.y);
+  drawGroundBackground();
+  drawTerrainDecor();
+  drawBelowActors();
+  drawActors();
+  drawAboveActors();
+  ctx.restore(); // DOM HUD, dialogue, inspection, and controls remain the UI/overlay layer.
+}
+
 let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (toastTimer > 0 && (toastTimer -= dt) <= 0) ui.toast.classList.add('hidden'); draw(); requestAnimationFrame(loop); }
 const keyMap: Record<string, string> = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
 addEventListener('keydown', event => { if (keyMap[event.key]) { keys.add(keyMap[event.key]); event.preventDefault(); } if ([' ', 'e', 'E'].includes(event.key)) { actionQueued = true; event.preventDefault(); } if (event.key === 'Escape') { closeDialogue(); closeInspection(); } }); addEventListener('keyup', event => { if (keyMap[event.key]) keys.delete(keyMap[event.key]); });
