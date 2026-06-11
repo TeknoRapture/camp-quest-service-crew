@@ -5,7 +5,7 @@ import { dialogue } from './content/dialogue';
 import { maps, mainCamp } from './content/maps';
 import { genericNpcPortrait } from './content/npcs';
 import { tasks } from './content/tasks';
-import type { DialogueSpeaker, InteractableDefinition, MapDefinition, Rect, TerrainFeature } from './content/types';
+import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, Rect, TerrainFeature } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
@@ -31,7 +31,33 @@ let actionQueued = false, dialogueOpen = true, inspectionOpen = false, toastTime
 const state = { talked: false, inventory: [] as string[], delivered: false };
 const allItems = Object.values(maps).flatMap(map => map.items);
 
-function obstacles() { return [...currentMap.buildings, ...currentMap.walls]; }
+function buildingCollisionRects(building: LocationDefinition): Rect[] {
+  const inset = building.collisionInset ?? {};
+  const left = inset.left ?? 0, right = inset.right ?? 0, top = inset.top ?? 0, bottom = inset.bottom ?? 0;
+  const core = { x: building.x + left, y: building.y + top, w: building.w - left - right, h: building.h - top - bottom };
+  const door = building.doorway;
+  if (!door) return [core];
+
+  const offset = Math.max(0, door.offset), width = Math.max(0, door.width);
+  if (door.side === 'bottom' && bottom > 0) return [core,
+    { x: building.x + left, y: building.y + building.h - bottom, w: offset - left, h: bottom },
+    { x: building.x + offset + width, y: building.y + building.h - bottom, w: building.w - right - offset - width, h: bottom },
+  ].filter(rect => rect.w > 0 && rect.h > 0);
+  if (door.side === 'top' && top > 0) return [core,
+    { x: building.x + left, y: building.y, w: offset - left, h: top },
+    { x: building.x + offset + width, y: building.y, w: building.w - right - offset - width, h: top },
+  ].filter(rect => rect.w > 0 && rect.h > 0);
+  if (door.side === 'right' && right > 0) return [core,
+    { x: building.x + building.w - right, y: building.y + top, w: right, h: offset - top },
+    { x: building.x + building.w - right, y: building.y + offset + width, w: right, h: building.h - bottom - offset - width },
+  ].filter(rect => rect.w > 0 && rect.h > 0);
+  if (door.side === 'left' && left > 0) return [core,
+    { x: building.x, y: building.y + top, w: left, h: offset - top },
+    { x: building.x, y: building.y + offset + width, w: left, h: building.h - bottom - offset - width },
+  ].filter(rect => rect.w > 0 && rect.h > 0);
+  return [core];
+}
+function obstacles() { return [...currentMap.buildings.flatMap(buildingCollisionRects), ...currentMap.walls]; }
 function isDone(id: string) { return id === 'talked' || id === 'delivered' ? state[id] : id === 'bridge' ? false : allItems.find(item => item.id === id)?.done; }
 function objective() { return tasks.find(({ id }) => !isDone(id))?.label ?? 'Report to the Rally Circle'; }
 function refreshUI() {
@@ -125,15 +151,19 @@ function drawTerrain(feature: TerrainFeature) {
   if (feature.kind === 'tile') { ctx.strokeStyle = '#a9b5a6'; ctx.lineWidth = 2; for (let x = feature.x; x < feature.x + feature.w; x += 40) for (let y = feature.y; y < feature.y + feature.h; y += 40) ctx.strokeRect(x, y, 40, 40); }
   if (feature.label) text(feature.label, feature.x + feature.w / 2, feature.y + 20, 11, '#f8edc9');
 }
-function drawBuilding(building: Rect & { label: string; color?: string }) {
+function drawBuilding(building: LocationDefinition) {
   ctx.fillStyle = building.color ?? '#a96e3e'; ctx.fillRect(building.x, building.y, building.w, building.h); ctx.fillStyle = '#4d2e20'; ctx.beginPath();
   ctx.moveTo(building.x - 10, building.y); ctx.lineTo(building.x + building.w / 2, building.y - 38); ctx.lineTo(building.x + building.w + 10, building.y); ctx.fill();
-  ctx.fillStyle = '#e8c47b'; ctx.fillRect(building.x + building.w / 2 - 15, building.y + building.h - 40, 30, 40); text(building.label, building.x + building.w / 2, building.y + building.h + 18, 12);
+  ctx.fillStyle = '#e8c47b';
+  const door = building.doorway;
+  if (door?.side === 'bottom') ctx.fillRect(building.x + door.offset, building.y + building.h - (building.collisionInset?.bottom ?? 40), door.width, building.collisionInset?.bottom ?? 40);
+  else ctx.fillRect(building.x + building.w / 2 - 15, building.y + building.h - 40, 30, 40);
+  text(building.label, building.x + building.w / 2, building.y + building.h + 18, 12);
 }
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save(); ctx.translate(-camera.x, -camera.y); ctx.fillStyle = currentMap.background; ctx.fillRect(0, 0, currentMap.size.w, currentMap.size.h);
   currentMap.terrain.forEach(drawTerrain);
-  if (currentMap.terrainStyle === 'outdoor') for (let x = 45; x < currentMap.size.w; x += 95) for (let y = 55; y < currentMap.size.h; y += 130) if (!obstacles().some(obstacle => intersects({ x: x - 20, y: y - 25, w: 40, h: 55 }, obstacle)) && !currentMap.terrain.some(feature => feature.kind !== 'woods' && intersects({ x: x - 20, y: y - 25, w: 40, h: 55 }, feature)) && ((x + y) % 4 !== 0)) drawTree(x, y);
+  if (currentMap.terrainStyle === 'outdoor') for (let x = 45; x < currentMap.size.w; x += 95) for (let y = 55; y < currentMap.size.h; y += 130) if (![...currentMap.buildings, ...currentMap.walls].some(obstacle => intersects({ x: x - 20, y: y - 25, w: 40, h: 55 }, obstacle)) && !currentMap.terrain.some(feature => feature.kind !== 'woods' && intersects({ x: x - 20, y: y - 25, w: 40, h: 55 }, feature)) && ((x + y) % 4 !== 0)) drawTree(x, y);
   if (currentMap.terrainStyle === 'interior') { ctx.fillStyle = '#665448'; currentMap.walls.forEach(wall => ctx.fillRect(wall.x, wall.y, wall.w, wall.h)); }
   currentMap.hazards.forEach(hazard => { if (hazard.assetId && drawSprite(ctx, assets, hazard.assetId, hazard)) { text(hazard.label, hazard.x + hazard.w / 2, hazard.y - 5, 10, '#e9dcaf'); return; } ctx.globalAlpha = .7; ctx.fillStyle = hazard.kind === 'mud' ? '#69553c' : hazard.kind === 'wet' || hazard.kind === 'water' ? '#68a9c7' : '#738044'; ctx.beginPath(); ctx.ellipse(hazard.x + hazard.w / 2, hazard.y + hazard.h / 2, hazard.w / 2, hazard.h / 2, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; });
   currentMap.buildings.forEach(drawBuilding);

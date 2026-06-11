@@ -31,7 +31,19 @@ export interface HazardDefinition extends Thing {
   kind: 'mud' | 'mosquitoes' | 'wet' | 'water' | 'snake' | 'mouse' | 'raccoon';
   assetId?: AssetId;
 }
-export interface LocationDefinition extends Thing {}
+export interface DoorwayDefinition {
+  side: 'bottom' | 'top' | 'left' | 'right';
+  /** Distance from the building's left edge for top/bottom doors, or top edge for left/right doors. */
+  offset: number;
+  width: number;
+}
+export interface CollisionInset { top?: number; right?: number; bottom?: number; left?: number; }
+export interface LocationDefinition extends Thing {
+  /** Optional open doorway kept aligned with the rendered door and generated building collision. */
+  doorway?: DoorwayDefinition;
+  /** Depth to inset collision on a building side so the doorway can be entered naturally. */
+  collisionInset?: CollisionInset;
+}
 export interface TerrainFeature extends Rect {
   id: string;
   kind: 'road' | 'field' | 'woods' | 'gorge' | 'stream' | 'lake' | 'tile' | 'shower';
