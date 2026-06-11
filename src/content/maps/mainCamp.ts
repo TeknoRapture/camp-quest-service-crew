@@ -15,6 +15,7 @@ export const mainCamp: MapDefinition = {
   size: { w: 1500, h: 1000 },
   background: '#78a956',
   terrainStyle: 'outdoor',
+  buildingFrontOverlap: 28,
   terrain: [
     { id: 'westWoods', kind: 'woods', label: 'Wooded Gorge Edge', x: 0, y: 0, w: 210, h: 1000 },
     { id: 'westGorge', kind: 'gorge', label: 'Cliff / Gorge Warning Area', x: 0, y: 70, w: 90, h: 790 },
@@ -36,7 +37,7 @@ export const mainCamp: MapDefinition = {
   exits: [
     {
       id: 'showerHouseEntrance', kind: 'map-exit', label: 'Enter Shower House',
-      x: 878, y: 548, w: 49, h: 36, targetMapId: 'showerHouse', targetSpawnId: 'entrance', activation: 'automatic',
+      x: 878, y: 557, w: 49, h: 28, targetMapId: 'showerHouse', targetSpawnId: 'entrance', activation: 'automatic',
     },
   ],
   npcs,

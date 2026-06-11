@@ -67,7 +67,7 @@ Static game content lives in `src/content/` so future changes can add or edit co
 - `maps/index.ts` registers maps available to the lightweight map switcher.
 - `types.ts` contains the shared TypeScript interfaces for content and map data.
 
-Future Codex tasks should add game content through these files when possible instead of hardcoding it into the gameplay loop. To add another interior, define a readable `MapDefinition`, register it in `maps/index.ts`, and pair indoor/outdoor `map-exit` interactables with matching spawn IDs. Normal open Shower House doorways use automatic overlap transitions. Enterable outdoor buildings can define an optional `doorway` plus a matching side in `collisionInset` to keep the rendered door and generated collision opening aligned; buildings without that metadata retain full-rectangle collision. Future locked, special, or story-gated exits can omit automatic activation and continue to use the Action button.
+Future Codex tasks should add game content through these files when possible instead of hardcoding it into the gameplay loop. To add another interior, define a readable `MapDefinition`, register it in `maps/index.ts`, and pair indoor/outdoor `map-exit` interactables with matching spawn IDs. Normal open Shower House doorways use automatic overlap transitions. Main Camp sets a modest `buildingFrontOverlap` that shortens outdoor building collision from the bottom while leaving each full building visual unchanged; a building can override it with `frontOverlap`. Doorway visuals are independent and can define their own `depth`, so future locked, special, or story-gated exits can omit automatic activation and continue to use the Action button.
 
 ## Expanding the game
 
