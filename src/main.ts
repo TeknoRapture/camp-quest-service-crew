@@ -31,33 +31,11 @@ let actionQueued = false, dialogueOpen = true, inspectionOpen = false, toastTime
 const state = { talked: false, inventory: [] as string[], delivered: false };
 const allItems = Object.values(maps).flatMap(map => map.items);
 
-function buildingCollisionRects(building: LocationDefinition): Rect[] {
-  const inset = building.collisionInset ?? {};
-  const left = inset.left ?? 0, right = inset.right ?? 0, top = inset.top ?? 0, bottom = inset.bottom ?? 0;
-  const core = { x: building.x + left, y: building.y + top, w: building.w - left - right, h: building.h - top - bottom };
-  const door = building.doorway;
-  if (!door) return [core];
-
-  const offset = Math.max(0, door.offset), width = Math.max(0, door.width);
-  if (door.side === 'bottom' && bottom > 0) return [core,
-    { x: building.x + left, y: building.y + building.h - bottom, w: offset - left, h: bottom },
-    { x: building.x + offset + width, y: building.y + building.h - bottom, w: building.w - right - offset - width, h: bottom },
-  ].filter(rect => rect.w > 0 && rect.h > 0);
-  if (door.side === 'top' && top > 0) return [core,
-    { x: building.x + left, y: building.y, w: offset - left, h: top },
-    { x: building.x + offset + width, y: building.y, w: building.w - right - offset - width, h: top },
-  ].filter(rect => rect.w > 0 && rect.h > 0);
-  if (door.side === 'right' && right > 0) return [core,
-    { x: building.x + building.w - right, y: building.y + top, w: right, h: offset - top },
-    { x: building.x + building.w - right, y: building.y + offset + width, w: right, h: building.h - bottom - offset - width },
-  ].filter(rect => rect.w > 0 && rect.h > 0);
-  if (door.side === 'left' && left > 0) return [core,
-    { x: building.x, y: building.y + top, w: left, h: offset - top },
-    { x: building.x, y: building.y + offset + width, w: left, h: building.h - bottom - offset - width },
-  ].filter(rect => rect.w > 0 && rect.h > 0);
-  return [core];
+function buildingCollisionRect(building: LocationDefinition): Rect {
+  const frontOverlap = Math.max(0, Math.min(building.h, building.frontOverlap ?? currentMap.buildingFrontOverlap ?? 0));
+  return { x: building.x, y: building.y, w: building.w, h: building.h - frontOverlap };
 }
-function obstacles() { return [...currentMap.buildings.flatMap(buildingCollisionRects), ...currentMap.walls]; }
+function obstacles() { return [...currentMap.buildings.map(buildingCollisionRect), ...currentMap.walls]; }
 function isDone(id: string) { return id === 'talked' || id === 'delivered' ? state[id] : id === 'bridge' ? false : allItems.find(item => item.id === id)?.done; }
 function objective() { return tasks.find(({ id }) => !isDone(id))?.label ?? 'Report to the Rally Circle'; }
 function refreshUI() {
@@ -156,7 +134,7 @@ function drawBuilding(building: LocationDefinition) {
   ctx.moveTo(building.x - 10, building.y); ctx.lineTo(building.x + building.w / 2, building.y - 38); ctx.lineTo(building.x + building.w + 10, building.y); ctx.fill();
   ctx.fillStyle = '#e8c47b';
   const door = building.doorway;
-  if (door?.side === 'bottom') ctx.fillRect(building.x + door.offset, building.y + building.h - (building.collisionInset?.bottom ?? 40), door.width, building.collisionInset?.bottom ?? 40);
+  if (door?.side === 'bottom') { const depth = door.depth ?? 40; ctx.fillRect(building.x + door.offset, building.y + building.h - depth, door.width, depth); }
   else ctx.fillRect(building.x + building.w / 2 - 15, building.y + building.h - 40, 30, 40);
   text(building.label, building.x + building.w / 2, building.y + building.h + 18, 12);
 }

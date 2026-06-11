@@ -36,13 +36,14 @@ export interface DoorwayDefinition {
   /** Distance from the building's left edge for top/bottom doors, or top edge for left/right doors. */
   offset: number;
   width: number;
+  /** Visual doorway depth. This is independent from the building's walkable front-overlap strip. */
+  depth?: number;
 }
-export interface CollisionInset { top?: number; right?: number; bottom?: number; left?: number; }
 export interface LocationDefinition extends Thing {
-  /** Optional open doorway kept aligned with the rendered door and generated building collision. */
+  /** Optional visible doorway; map-exit activation determines whether it is open, locked, or action-gated. */
   doorway?: DoorwayDefinition;
-  /** Depth to inset collision on a building side so the doorway can be entered naturally. */
-  collisionInset?: CollisionInset;
+  /** Optional per-building override for the walkable strip along the lower/front edge. */
+  frontOverlap?: number;
 }
 export interface TerrainFeature extends Rect {
   id: string;
@@ -58,6 +59,8 @@ export interface MapDefinition {
   size: { w: number; h: number };
   background: string;
   terrainStyle: 'outdoor' | 'interior';
+  /** Default walkable depth along the lower/front edge of buildings; walls remain unaffected. */
+  buildingFrontOverlap?: number;
   terrain: TerrainFeature[];
   buildings: LocationDefinition[];
   walls: Rect[];
