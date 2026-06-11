@@ -4,8 +4,9 @@ import { drawSprite } from './sprites';
 import { dialogue } from './content/dialogue';
 import { maps, mainCamp } from './content/maps';
 import { genericNpcPortrait } from './content/npcs';
+import { skills } from './content/skills';
 import { tasks } from './content/tasks';
-import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, Rect, TerrainFeature } from './content/types';
+import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, Rect, SkillId, TerrainFeature } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
@@ -28,7 +29,11 @@ const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, 
 const camera = { x: 0, y: 0 };
 const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = true, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
-const state = { talked: false, inventory: [] as string[], delivered: false };
+let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
+const state = {
+  talked: false, inventory: [] as string[], delivered: false,
+  skills: { nature: false, swimming: false, climbing: false } as Record<SkillId, boolean>,
+};
 const allItems = Object.values(maps).flatMap(map => map.items);
 
 function buildingCollisionRect(building: LocationDefinition): Rect {
@@ -36,6 +41,15 @@ function buildingCollisionRect(building: LocationDefinition): Rect {
   return { x: building.x, y: building.y, w: building.w, h: building.h - frontOverlap };
 }
 function obstacles() { return [...currentMap.buildings.map(buildingCollisionRect), ...currentMap.walls]; }
+function hasSkill(skillId: SkillId) { return state.skills[skillId]; }
+function blockedTerrain() {
+  return currentMap.terrain.find(feature => feature.blocksMovement && intersects(player, feature) && (!feature.requiredSkill || !hasSkill(feature.requiredSkill)));
+}
+function showMissingTerrainSkill(feature: TerrainFeature) {
+  if (blockedSkillMessageCooldown > 0 && lastBlockedTerrainId === feature.id) return;
+  const message = feature.missingSkillMessage ?? (feature.requiredSkill ? skills[feature.requiredSkill].missingSkillMessage : 'That terrain is blocked.');
+  toast(message); blockedSkillMessageCooldown = 1.25; lastBlockedTerrainId = feature.id;
+}
 function isDone(id: string) { return id === 'talked' || id === 'delivered' ? state[id] : id === 'bridge' ? false : allItems.find(item => item.id === id)?.done; }
 function objective() { return tasks.find(({ id }) => !isDone(id))?.label ?? 'Report to the Rally Circle'; }
 function refreshUI() {
@@ -106,18 +120,28 @@ function interact() {
   toast('Nothing useful nearby. Service Crew Rule #2: check the weirdest place first.');
 }
 function move(dx: number, dy: number) {
-  const old = { x: player.x, y: player.y }; player.x += dx; if (obstacles().some(obstacle => intersects(player, obstacle))) player.x = old.x;
-  player.y += dy; if (obstacles().some(obstacle => intersects(player, obstacle))) player.y = old.y;
+  const old = { x: player.x, y: player.y };
+  player.x += dx;
+  const blockedX = blockedTerrain();
+  if (obstacles().some(obstacle => intersects(player, obstacle)) || blockedX) { player.x = old.x; if (blockedX) showMissingTerrainSkill(blockedX); }
+  player.y += dy;
+  const blockedY = blockedTerrain();
+  if (obstacles().some(obstacle => intersects(player, obstacle)) || blockedY) { player.y = old.y; if (blockedY) showMissingTerrainSkill(blockedY); }
   player.x = Math.max(5, Math.min(currentMap.size.w - player.w - 5, player.x)); player.y = Math.max(5, Math.min(currentMap.size.h - player.h - 5, player.y));
 }
 function update(dt: number) {
-  transitionCooldown = Math.max(0, transitionCooldown - dt);
+  transitionCooldown = Math.max(0, transitionCooldown - dt); blockedSkillMessageCooldown = Math.max(0, blockedSkillMessageCooldown - dt);
   if (actionQueued) { actionQueued = false; interact(); }
   if (dialogueOpen || inspectionOpen) return;
   const x = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0), y = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0); const len = Math.hypot(x, y) || 1;
   const hazard = currentMap.hazards.find(item => intersects(player, item)); const speed = player.speed * (hazard && hazard.kind !== 'mosquitoes' ? .55 : 1); move(x / len * speed * dt, y / len * speed * dt);
   if (tryAutomaticExit()) return;
-  hazardTick -= dt; if (hazard?.kind === 'mosquitoes' && hazardTick <= 0) { player.energy = Math.max(0, player.energy - 4); hazardTick = .5; toast('Mosquito cloud! Energy -4'); refreshUI(); }
+  hazardTick -= dt;
+  if (hazard?.energyDamage && hazardTick <= 0) {
+    const multiplier = hazard.mitigationSkill && hasSkill(hazard.mitigationSkill) ? hazard.mitigationMultiplier ?? 1 : 1;
+    const damage = hazard.energyDamage * multiplier; player.energy = Math.max(0, player.energy - damage); hazardTick = hazard.damageInterval ?? .5;
+    toast(`${hazard.damageMessage ?? hazard.label} Energy -${damage}`); refreshUI();
+  }
   camera.x = Math.max(0, Math.min(Math.max(0, currentMap.size.w - canvas.width), player.x - canvas.width / 2));
   camera.y = Math.max(0, Math.min(Math.max(0, currentMap.size.h - canvas.height), player.y - canvas.height / 2));
 }

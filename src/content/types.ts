@@ -10,6 +10,8 @@ export interface DialogueSpeaker { displayName?: string; label?: string; accent?
 export interface NPCDefinition extends Thing { displayName?: string; accent?: string; portraits?: PortraitSet; dialogueId: string; }
 export type Dialogue = Record<string, readonly string[]>;
 export interface TaskDefinition { id: string; label: string; }
+export type SkillId = 'nature' | 'swimming' | 'climbing';
+export interface SkillDefinition { id: SkillId; label: string; missingSkillMessage: string; }
 export interface ItemDefinition extends Thing {
   assetId?: AssetId;
   description?: string;
@@ -28,8 +30,17 @@ export interface InteractableDefinition extends Thing {
   activation?: 'automatic' | 'action';
 }
 export interface HazardDefinition extends Thing {
-  kind: 'mud' | 'mosquitoes' | 'wet' | 'water' | 'snake' | 'mouse' | 'raccoon';
+  kind: 'mud' | 'mosquitoes' | 'wet' | 'water' | 'snake' | 'mouse' | 'raccoon' | 'spider' | 'vulture' | 'bee' | 'wasp';
   assetId?: AssetId;
+  /** Skill required by a future special interaction such as taming, calming, or redirecting wildlife. */
+  interactionSkill?: SkillId;
+  missingSkillMessage?: string;
+  /** Optional periodic energy damage and content-driven mitigation. */
+  energyDamage?: number;
+  damageInterval?: number;
+  damageMessage?: string;
+  mitigationSkill?: SkillId;
+  mitigationMultiplier?: number;
 }
 export interface DoorwayDefinition {
   side: 'bottom' | 'top' | 'left' | 'right';
@@ -49,6 +60,10 @@ export interface TerrainFeature extends Rect {
   id: string;
   kind: 'road' | 'field' | 'woods' | 'gorge' | 'stream' | 'lake' | 'tile' | 'shower';
   label?: string;
+  /** Blocking terrain with a required skill becomes traversable once that skill is available. */
+  blocksMovement?: boolean;
+  requiredSkill?: SkillId;
+  missingSkillMessage?: string;
 }
 export interface NamedZone extends Rect { id: string; label: string; }
 
