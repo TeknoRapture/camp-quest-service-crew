@@ -1,9 +1,12 @@
 import { hazards } from '../hazards';
 import { interactables } from '../interactables';
 import { items } from '../items';
-import { blockedBridge, locations } from '../locations';
+import { blockedBridge, locations, showerHouseLocation } from '../locations';
 import { npcs } from '../npcs';
 import type { MapDefinition } from '../types';
+
+const showerHouseDoorway = showerHouseLocation.doorway!;
+const showerHouseDoorDepth = showerHouseDoorway.depth ?? 40;
 
 /**
  * Main Camp uses broad, connected regions: a quiet western gorge, southwest arrival area,
@@ -43,7 +46,8 @@ export const mainCamp: MapDefinition = {
   exits: [
     {
       id: 'showerHouseEntrance', kind: 'map-exit', label: 'Enter Shower House',
-      x: 1758, y: 1007, w: 49, h: 28, targetMapId: 'showerHouse', targetSpawnId: 'entrance', activation: 'automatic',
+      x: showerHouseLocation.x + showerHouseDoorway.offset, y: showerHouseLocation.y + showerHouseLocation.h - showerHouseDoorDepth,
+      w: showerHouseDoorway.width, h: 28, targetMapId: 'showerHouse', targetSpawnId: 'entrance', activation: 'automatic',
     },
   ],
   npcs,
