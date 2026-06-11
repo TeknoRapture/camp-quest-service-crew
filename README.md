@@ -2,14 +2,15 @@
 
 A small, mobile-first retro camp adventure built as a static browser game. The morning bell has rung, but Service Crew cannot start until somebody solves the ancient mystery: **who took the mop?**
 
-This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue with reusable portraits, collision, hazards, supply pickups, a delivery, a Service Checklist, Energy, Service Points, a saved best score, and a blocked bridge teasing the Back 40. It also includes an incremental SVG sprite pipeline with shape-drawing fallbacks and reusable image inspection overlays.
+This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue with reusable portraits, collision, hazards, supply pickups, a delivery, a Service Checklist, Energy, Service Points, a saved best score, skill-gated terrain, and a blocked bridge teasing the Back 40. It also includes an incremental SVG sprite pipeline with shape-drawing fallbacks and reusable image inspection overlays.
 
 ## Play
 
 - **Phone:** use the on-screen D-pad and large **ACTION** button.
 - **Desktop:** move with WASD or arrow keys; interact with Space or E.
 - Talk to Coop by the Welcome Center, recover supplies, deliver the crate to the Dining Hall, and walk into the Shower House doorway to explore the proof-of-concept interior.
-- Mud, wet floors, water, and camp creatures slow movement. Mosquito clouds reduce Energy.
+- Mud, wet floors, and camp creatures slow movement. Lake and stream terrain require Swimming, while gorge terrain requires Climbing. All skills currently start locked.
+- Mosquito clouds reduce Energy. Their content metadata prepares Nature Skills to reduce nuisance-wildlife damage once that skill can be unlocked.
 
 ## Setup and development
 
@@ -60,12 +61,13 @@ Static game content lives in `src/content/` so future changes can add or edit co
 - `tasks.ts` controls Service Checklist objectives.
 - `items.ts` controls collectible tools and supplies.
 - `interactables.ts` controls signs, inspection objects, and interaction zones.
-- `hazards.ts` controls terrain and wildlife hazards.
+- `hazards.ts` controls terrain and wildlife hazards, including future Nature Skills interactions and damage mitigation.
+- `skills.ts` defines the small static skill catalog and default missing-skill messages.
 - `locations.ts` controls named outdoor buildings and other map objects.
 - `maps/mainCamp.ts` composes the intentionally arranged outdoor map, terrain, zones, placements, collision, and Shower House entrance.
 - `maps/showerHouse.ts` defines the first small interior, including its walls, wet-floor hazard, cleaning spot, and exit.
 - `maps/index.ts` registers maps available to the lightweight map switcher.
-- `types.ts` contains the shared TypeScript interfaces for content and map data.
+- `types.ts` contains the shared TypeScript interfaces for content, maps, skills, terrain gates, and hazard mitigation data.
 
 Future Codex tasks should add game content through these files when possible instead of hardcoding it into the gameplay loop. To add another interior, define a readable `MapDefinition`, register it in `maps/index.ts`, and pair indoor/outdoor `map-exit` interactables with matching spawn IDs. Normal open Shower House doorways use automatic overlap transitions. Main Camp sets a modest `buildingFrontOverlap` that shortens outdoor building collision from the bottom while leaving each full building visual unchanged; a building can override it with `frontOverlap`. Doorway visuals are independent and can define their own `depth`, so future locked, special, or story-gated exits can omit automatic activation and continue to use the Action button. The canvas renderer uses a small named pass order—ground/background, terrain/decor, below actors, actors, then above actors—so outdoor building bodies and doors stay below the player while roofs and overhangs can cover actors for the top-down overlap illusion.
 
