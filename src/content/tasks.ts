@@ -9,5 +9,5 @@ export const tasks: TaskDefinition[] = [
   { id: 'gloves', label: 'Find the cleaning gloves', targetType: 'item', targetId: 'gloves', targetMapId: 'mainCamp' },
   { id: 'bags', label: 'Find the trash bags', targetType: 'item', targetId: 'bags', targetMapId: 'mainCamp' },
   { id: 'delivered', label: 'Deliver a supply crate to Dining Hall', targetType: 'interactable', targetId: 'diningDelivery', targetMapId: 'mainCamp', targetLabel: 'Dining Hall' },
-  { id: 'bridge', label: 'Investigate the blocked Back 40 bridge', targetType: 'interactable', targetId: 'blockedBridgeMessage', targetMapId: 'mainCamp', targetLabel: 'Blocked bridge' },
+  { id: 'bridge', label: 'Investigate the blocked Back 40 bridge', targetType: 'interactable', targetId: 'back40TeaserMessage', targetMapId: 'mainCamp', targetLabel: 'Back 40 bridge' },
 ];
