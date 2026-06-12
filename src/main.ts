@@ -27,7 +27,7 @@ const ui = {
 let currentMap: MapDefinition = mainCamp;
 const start = currentMap.spawns.find(({ id }) => id === 'start')!;
 const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, points: 0 };
-const camera = { x: 0, y: 0 };
+const camera = { x: Math.max(0, start.x - canvas.width / 2), y: Math.max(0, start.y - canvas.height / 2) };
 const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = true, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
@@ -209,7 +209,23 @@ function drawGroundBackground() {
 }
 function drawTerrainDecor() {
   currentMap.terrain.forEach(drawTerrain);
-  if (currentMap.terrainStyle === 'outdoor') for (let x = 45; x < currentMap.size.w; x += 95) for (let y = 55; y < currentMap.size.h; y += 130) if (![...currentMap.buildings, ...currentMap.walls].some(obstacle => intersects({ x: x - 20, y: y - 25, w: 40, h: 55 }, obstacle)) && !currentMap.terrain.some(feature => feature.kind !== 'woods' && intersects({ x: x - 20, y: y - 25, w: 40, h: 55 }, feature)) && ((x + y) % 4 !== 0)) drawTree(x, y);
+  if (currentMap.terrainStyle === 'outdoor') {
+    // Only consider procedural trees near the camera. This keeps the denser expanded woods mobile-friendly.
+    const margin = 90, spacing = 90;
+    const minX = Math.max(45, Math.floor((camera.x - margin) / spacing) * spacing + 45);
+    const maxX = Math.min(currentMap.size.w, camera.x + canvas.width + margin);
+    const minY = Math.max(55, Math.floor((camera.y - margin) / spacing) * spacing + 55);
+    const maxY = Math.min(currentMap.size.h, camera.y + canvas.height + margin);
+    const protectedThings: Rect[] = [...currentMap.buildings, ...currentMap.walls, ...currentMap.npcs, ...currentMap.items, ...currentMap.interactables, ...currentMap.exits, ...currentMap.hazards];
+    for (let x = minX; x < maxX; x += spacing) for (let y = minY; y < maxY; y += spacing) {
+      const tree = { x: x - 25, y: y - 30, w: 50, h: 65 };
+      const inWoods = currentMap.terrain.some(feature => feature.kind === 'woods' && intersects(tree, feature));
+      const onClearedTerrain = currentMap.terrain.some(feature => feature.kind !== 'woods' && intersects(tree, feature));
+      const nearContent = protectedThings.some(thing => intersects(tree, { x: thing.x - 18, y: thing.y - 18, w: thing.w + 36, h: thing.h + 36 }));
+      const densityPick = Math.abs((x * 17 + y * 29) % 11);
+      if (!onClearedTerrain && !nearContent && (inWoods ? densityPick !== 0 : densityPick < 3)) drawTree(x, y);
+    }
+  }
   if (currentMap.terrainStyle === 'interior') { ctx.fillStyle = '#665448'; currentMap.walls.forEach(wall => ctx.fillRect(wall.x, wall.y, wall.w, wall.h)); }
 }
 function drawBelowActors() {
@@ -217,6 +233,7 @@ function drawBelowActors() {
   const bridge = currentMap.interactables.find(({ id }) => id === 'blockedBridgeMessage'); if (bridge) { ctx.fillStyle = '#6d4b2f'; ctx.fillRect(bridge.x + 35, bridge.y + 35, 70, 95); if (!isBridgeUnlocked()) { ctx.fillStyle = '#d65b38'; for (let i = 0; i < 4; i++) ctx.fillRect(bridge.x + 40 + i * 18, bridge.y + 40, 9, 85); text('BRIDGE CLOSED · DAY 1', bridge.x + bridge.w / 2, bridge.y + bridge.h + 14, 12, '#ffd76d'); } }
   const teaser = currentMap.interactables.find(({ id }) => id === 'back40TeaserMessage'); if (teaser && isBridgeUnlocked()) { ctx.fillStyle = '#f5e6b8'; ctx.fillRect(teaser.x, teaser.y, teaser.w, teaser.h); ctx.strokeStyle = '#d65b38'; ctx.lineWidth = 4; ctx.strokeRect(teaser.x, teaser.y, teaser.w, teaser.h); text('UNDER CONSTRUCTION', teaser.x + teaser.w / 2, teaser.y + 27, 11, '#a43f28'); text('BACK 40 COMING SOON!', teaser.x + teaser.w / 2, teaser.y + 47, 10, '#a43f28'); }
   const cliffSign = currentMap.interactables.find(({ id }) => id === 'cliffSign'); if (cliffSign && !drawSprite(ctx, assets, 'cliffSign', cliffSign)) { ctx.fillStyle = '#fff'; ctx.fillRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.strokeRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); text('BEWARE', cliffSign.x + 37, cliffSign.y + 21, 10, '#e33'); text('of', cliffSign.x + 37, cliffSign.y + 38, 9, '#e33'); text('CLIFF!', cliffSign.x + 37, cliffSign.y + 57, 11, '#e33'); }
+  const flagpole = currentMap.interactables.find(({ id }) => id === 'flagpole'); if (flagpole) { ctx.fillStyle = '#d8dfd2'; ctx.fillRect(flagpole.x + 18, flagpole.y, 5, flagpole.h); ctx.fillStyle = '#f5e6b8'; ctx.fillRect(flagpole.x + 7, flagpole.y + flagpole.h - 8, 28, 8); ctx.fillStyle = '#d6533d'; ctx.beginPath(); ctx.moveTo(flagpole.x + 23, flagpole.y + 8); ctx.lineTo(flagpole.x + 60, flagpole.y + 20); ctx.lineTo(flagpole.x + 23, flagpole.y + 34); ctx.fill(); text('FLAGPOLE', flagpole.x + 21, flagpole.y + flagpole.h + 14, 10, '#fff3ae'); }
   currentMap.interactables.filter(({ kind }) => kind === 'task-location').forEach(spot => { ctx.strokeStyle = '#f8e278'; ctx.lineWidth = 4; ctx.strokeRect(spot.x, spot.y, spot.w, spot.h); text(spot.label, spot.x + spot.w / 2, spot.y - 8, 10, '#fff3ae'); });
 }
 function drawActors() {
