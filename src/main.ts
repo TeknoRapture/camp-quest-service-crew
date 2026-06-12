@@ -6,7 +6,7 @@ import { maps, mainCamp } from './content/maps';
 import { genericNpcPortrait } from './content/npcs';
 import { skills } from './content/skills';
 import { tasks } from './content/tasks';
-import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, Rect, SkillId, TerrainFeature } from './content/types';
+import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, ObjectiveTargetType, Rect, SkillId, TaskDefinition, TerrainFeature, Thing } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
@@ -51,7 +51,19 @@ function showMissingTerrainSkill(feature: TerrainFeature) {
   toast(message); blockedSkillMessageCooldown = 1.25; lastBlockedTerrainId = feature.id;
 }
 function isDone(id: string) { return id === 'talked' || id === 'delivered' ? state[id] : id === 'bridge' ? false : allItems.find(item => item.id === id)?.done; }
-function objective() { return tasks.find(({ id }) => !isDone(id))?.label ?? 'Report to the Rally Circle'; }
+function activeTask() { return tasks.find(({ id }) => !isDone(id)); }
+function objective() { return activeTask()?.label ?? 'Report to the Rally Circle'; }
+function resolveObjectiveTarget(task: TaskDefinition) {
+  if (!task.targetType || !task.targetId) return;
+  const targetMap = maps[task.targetMapId ?? mainCamp.id];
+  if (!targetMap) return;
+  const collections: Record<ObjectiveTargetType, Thing[]> = {
+    item: targetMap.items, npc: targetMap.npcs, interactable: targetMap.interactables, exit: targetMap.exits, zone: targetMap.zones, location: targetMap.buildings,
+  };
+  const target = collections[task.targetType].find(({ id }) => id === task.targetId);
+  if (!target || (task.targetType === 'item' && target.done)) return;
+  return { target, mapId: targetMap.id, label: task.targetLabel ?? target.label };
+}
 function refreshUI() {
   ui.energy.style.width = `${player.energy}%`; ui.points.textContent = `${player.points} SP`;
   const best = Number(localStorage.getItem('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
@@ -189,6 +201,35 @@ function drawActors() {
 function drawAboveActors() {
   if (currentMap.terrainStyle === 'outdoor') currentMap.buildings.forEach(drawBuildingRoof);
 }
+function drawObjectiveArrow() {
+  if (dialogueOpen || inspectionOpen) return;
+  const task = activeTask();
+  const resolved = task && resolveObjectiveTarget(task);
+  if (!resolved || resolved.mapId !== currentMap.id) return;
+
+  const playerCenter = { x: player.x + player.w / 2, y: player.y + player.h / 2 };
+  const targetCenter = { x: resolved.target.x + resolved.target.w / 2, y: resolved.target.y + resolved.target.h / 2 };
+  const dx = targetCenter.x - playerCenter.x, dy = targetCenter.y - playerCenter.y;
+  const distance = Math.hypot(dx, dy);
+  const targetScreen = { x: targetCenter.x - camera.x, y: targetCenter.y - camera.y };
+  const closeDistance = 180;
+  if (distance <= closeDistance) return;
+
+  const inset = 42;
+  const arrowX = Math.max(inset, Math.min(canvas.width - inset, targetScreen.x));
+  const arrowY = Math.max(inset, Math.min(canvas.height - inset, targetScreen.y));
+  const angle = Math.atan2(dy, dx);
+  ctx.save(); ctx.translate(arrowX, arrowY); ctx.rotate(angle);
+  ctx.fillStyle = '#19301d'; ctx.beginPath(); ctx.moveTo(19, 0); ctx.lineTo(-11, -14); ctx.lineTo(-5, 0); ctx.lineTo(-11, 14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ffd65a'; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -10); ctx.lineTo(-3, 0); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill(); ctx.restore();
+
+  ctx.font = '900 11px Nunito';
+  const labelWidth = Math.min(150, ctx.measureText(resolved.label).width + 14);
+  const labelX = Math.max(labelWidth / 2 + 4, Math.min(canvas.width - labelWidth / 2 - 4, arrowX));
+  const labelY = Math.max(17, Math.min(canvas.height - 7, arrowY + 27));
+  ctx.fillStyle = '#19301de8'; ctx.fillRect(labelX - labelWidth / 2, labelY - 14, labelWidth, 18);
+  text(resolved.label, labelX, labelY, 11, '#fff3ae');
+}
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save(); ctx.translate(-camera.x, -camera.y);
   drawGroundBackground();
@@ -197,6 +238,7 @@ function draw() {
   drawActors();
   drawAboveActors();
   ctx.restore(); // DOM HUD, dialogue, inspection, and controls remain the UI/overlay layer.
+  drawObjectiveArrow();
 }
 
 let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (toastTimer > 0 && (toastTimer -= dt) <= 0) ui.toast.classList.add('hidden'); draw(); requestAnimationFrame(loop); }
