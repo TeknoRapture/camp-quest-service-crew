@@ -9,7 +9,15 @@ export interface PortraitSet { default?: string; happy?: string; serious?: strin
 export interface DialogueSpeaker { displayName?: string; label?: string; accent?: string; portraits?: PortraitSet; }
 export interface NPCDefinition extends Thing { displayName?: string; accent?: string; portraits?: PortraitSet; dialogueId: string; }
 export type Dialogue = Record<string, readonly string[]>;
-export interface TaskDefinition { id: string; label: string; }
+export type ObjectiveTargetType = 'item' | 'npc' | 'interactable' | 'exit' | 'zone' | 'location';
+export interface TaskDefinition {
+  id: string;
+  label: string;
+  targetType?: ObjectiveTargetType;
+  targetId?: string;
+  targetMapId?: string;
+  targetLabel?: string;
+}
 export type SkillId = 'nature' | 'swimming' | 'climbing';
 export interface SkillDefinition { id: SkillId; label: string; missingSkillMessage: string; }
 export interface ItemDefinition extends Thing {
