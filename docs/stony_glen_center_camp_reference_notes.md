@@ -6,7 +6,7 @@
 
 - **Image pixel coordinates:** origin is top-left; image size is **1536 × 1152** pixels.
 - **Normalized coordinates:** `x%` and `y%` are image-relative percentages from top-left.
-- **Projected game coordinates:** approximate projection onto the current game map size **2400 × 1600**. Use these as starting points only; nudge for gameplay readability.
+- **Historical projected game coordinates:** approximate projection onto the earlier **2400 × 1600** prototype. The current Main Camp is **4800 × 3200**; use the projections only as relative-placement references, not coordinates to double mechanically.
 - **Rotation decision:** keep all in-game buildings axis-aligned for gameplay. Use relative placement, roads, terrain, and spacing to evoke the real map rather than rotating buildings.
 
 ## High-Level Layout Facts
@@ -17,7 +17,7 @@
 - **Bathhouse** is east/southeast of Dining Hall.
 - Cabins and small buildings wrap around the south/southwest loop: Hawthorne, Stoddard, Philippians, Beech, Mildon, Juniper, Hickory, Patrick, Maple, Cherry, Willow.
 - The **bridge** near the lake connects toward the lower/southeastern Back 40 side: Pine, A-Frame, pavilion, Don’s Place.
-- For Day 1, the bridge/Back 40 route should stay blocked or gated.
+- The bridge/Back 40 route stays gated until the other current objectives are complete, then opens only into a small under-construction teaser.
 
 ## Major Region Bounding Boxes
 
@@ -28,7 +28,7 @@
 | Cabin Loop West/South | `(220,500)-(760,900)` | `(14.3,43.4)-(49.5,78.1)` | `(344,694)-(1188,1250)` | Hawthorne, Stoddard, Philippians, Beech, Juniper, Hickory, Patrick. |
 | Bathhouse / East Cabins | `(760,520)-(1050,730)` | `(49.5,45.1)-(68.4,63.4)` | `(1188,722)-(1641,1014)` | Bathhouse, Mildon, Cherry, Willow road approach. |
 | Lake / Waterfront | `(1100,430)-(1535,900)` | `(71.6,37.3)-(99.9,78.1)` | `(1719,597)-(2398,1250)` | Waterfront and lake on eastern edge. |
-| Bridge / Back 40 Gate | `(980,730)-(1120,880)` | `(63.8,63.4)-(72.9,76.4)` | `(1531,1014)-(1750,1222)` | Bridge near lake; should remain blocked for Day 1. |
+| Bridge / Back 40 Gate | `(980,730)-(1120,880)` | `(63.8,63.4)-(72.9,76.4)` | `(1531,1014)-(1750,1222)` | Historical projection only; bridge near lake remains gated until the small teaser unlocks. |
 | Back 40 South/East | `(620,880)-(1470,1120)` | `(40.4,76.4)-(95.7,97.2)` | `(969,1222)-(2297,1556)` | Pine, A-Frame, pavilion, Don's Place, lower-side buildings. |
 | West Woods / Ranges | `(0,320)-(400,980)` | `(0.0,27.8)-(26.0,85.1)` | `(0,444)-(625,1361)` | Crusader, Archery Range, Stoddard edge, Gun Range. |
 | North Woods / Walnut | `(150,60)-(650,240)` | `(9.8,5.2)-(42.3,20.8)` | `(234,83)-(1016,333)` | Walnut and wooded north edge. |
@@ -62,10 +62,22 @@
 | Juniper | cabin/building | `(425,780)` | `(27.7,67.7)` | `(664,1083)` | Southwest of Philippians, near lower path loop. |
 | Hickory | cabin/building | `(320,700)` | `(20.8,60.8)` | `(500,972)` | West/southwest of Philippians on path branch. |
 | Gun Range | activity area | `(380,950)` | `(24.7,82.5)` | `(594,1319)` | Lower-left activity area, peripheral. |
-| Pine | cabin/building | `(705,1050)` | `(45.9,91.1)` | `(1102,1458)` | Across river / Back 40 side; not Day 1 main access. |
+| Pine | cabin/building | `(705,1050)` | `(45.9,91.1)` | `(1102,1458)` | Across river / Back 40 side; visible as part of the small teaser. |
 | A-Frame | cabin/building | `(965,1045)` | `(62.8,90.7)` | `(1508,1451)` | Across river / Back 40 side. |
 | Pavilion | building | `(1265,985)` | `(82.4,85.5)` | `(1977,1368)` | Across bridge / near Don's Place, Back 40 side. |
 | Don's Place | building | `(1360,920)` | `(88.5,79.9)` | `(2125,1278)` | Across bridge / east-southeast Back 40 area. |
+
+
+## Corrected Stream / Gorge / Gorge Trail Interpretation
+
+The Main Camp implementation must use this north-to-south relationship, even where older projections or map-reading notes suggest otherwise:
+
+1. **Stream:** the stream forms the top/north natural border of Main Camp.
+2. **Gorge:** the gorge sits immediately below/south of the stream and remains Climbing-gated where applicable.
+3. **Gorge trail:** the walkable gorge-edge trail runs below/south of the gorge, beside the blocking terrain rather than through it.
+4. **Tree House:** the Tree House belongs directly beside the gorge, visually hanging slightly over its edge. Its entrance faces the gorge side of the gorge trail.
+
+Do not create gaps that allow the stream or gorge gates to be bypassed. Trails shown in this pass are placeholders for later manual refinement.
 
 ## Relative Placement Rules for Codex
 
@@ -81,13 +93,15 @@
 - Cabins form a loose southern/southwestern loop; avoid clustering them tightly.
 - Lake and Waterfront are on the far east/right side.
 - Bridge sits near the southeast/east edge of lake and should gate the Back 40 route.
-- Pine, A-Frame, pavilion, and Don’s Place are across the bridge / Back 40 side and should stay inaccessible on Day 1 unless intentionally teased.
-- Use curved paths/roads and wooded buffers to evoke the real layout more than exact building angles.
+- Pine, A-Frame, Footprints Pavilion, and Don’s Place are across the bridge / Back 40 side and remain visible landmarks around the intentionally small teaser area.
+- Use connected placeholder paths/roads and wooded buffers to evoke the real layout more than exact building angles.
+- Preserve the corrected northern order: stream → gorge → gorge trail, with the Tree House directly beside the gorge.
 
 ## Road / Path Network Notes
 
 - **Entrance Road:** Road enters from west edge and curves into the Parking Lot; connects to central paths near Dining Hall.
-- **Main North Road:** Central junction east of Dining Hall curves northeast toward Nurse Station, Gym, and the long road to the right.
+- **Main North Road:** Central junction east of Dining Hall heads northeast toward Nurse Station, Gym, and the long road to the right.
+- **Gorge-edge Trail:** Walkable trail south of the gorge, connecting the Cliff warning and Tree House areas to Gym/Rally Field.
 - **Dining Hall Path Loop:** Dense path loop around Dining Hall connecting Parking Lot, Chapel/field, cabins, and Bathhouse.
 - **Cabin Loop:** Curving southwest/south paths connecting Hawthorne, Philippians, Beech, Juniper, Hickory, Patrick, Mildon.
 - **Lake/Bridge Road:** Path from central/east camp goes toward Willow/Waterfront and down toward the bridge.
@@ -97,9 +111,9 @@
 
 - Use the projected coordinates as rough anchors only; adjust to keep travel time fun, paths readable, and interactions reachable.
 - The game map currently uses a wider aspect ratio than the reference image, so horizontal spacing may need extra room.
-- If using a 2400×1600 map, preserve the relative ordering but widen paths and fields beyond strict projection.
+- For the expanded 4800×3200 Main Camp, preserve relative ordering while using the added space for woods, trail buffers, and readable objective routes.
 - Keep terrain skill gates aligned with features: lake/stream require Swimming, gorge/cliff areas require Climbing.
-- Keep Back 40 blocked on Day 1 at the bridge.
+- Keep the bridge blocked until the other current objectives are complete; then allow access only to the small under-construction Back 40 teaser.
 
 ## Possible Content Mapping for Current Game Names
 
