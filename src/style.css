@@ -11,3 +11,5 @@ button { font: inherit; cursor: pointer; border: 0; color: inherit; }
 .inspection-card img.hidden{display:none}.inspection-fallback{width:min(260px,100%);aspect-ratio:3/4;margin:auto;display:grid;place-items:center;padding:20px;background:#fffdf3;color:#a43f28;border:4px dashed #80552a;border-radius:4px;font-weight:900}.inspection-fallback.hidden{display:none}
 
 @media(max-width:420px){.dialogue{left:3%;right:3%;grid-template-columns:68px minmax(0,1fr);gap:8px;padding:7px 9px}.portrait-panel{padding:2px}.portrait-panel img{max-height:82px}.dialogue p{font-size:12px}}
+
+#game-shell.title-phase{grid-template-rows:minmax(0,1fr)}#game-shell.title-phase>.hud,#game-shell.title-phase>.objective,#game-shell.title-phase>.controls,#game-shell.title-phase>footer,#game-shell.title-phase .checklist{display:none!important}

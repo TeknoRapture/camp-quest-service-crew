@@ -1,10 +1,11 @@
 import './style.css';
-import { AssetLoader, type AssetId } from './assets';
+import { AssetLoader, type AssetId, type AssetProgress } from './assets';
 import { drawSprite } from './sprites';
 import { dialogue } from './content/dialogue';
 import { maps, mainCamp } from './content/maps';
+import { chooseLoadingTip } from './content/loadingTips';
 import { blockedBridge } from './content/locations';
-import { genericNpcPortrait } from './content/npcs';
+import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
 import { tasks } from './content/tasks';
 import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, ObjectiveTargetType, Rect, SkillId, TaskDefinition, TerrainFeature, Thing } from './content/types';
@@ -12,7 +13,10 @@ import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDe
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
 const assets = new AssetLoader();
-assets.loadAll();
+type GamePhase = 'loading' | 'ready' | 'playing';
+let gamePhase: GamePhase = 'loading';
+let loadingProgress: AssetProgress = { total: 0, settled: 0, loaded: 0, failed: 0 };
+const loadingTip = chooseLoadingTip();
 const ui = {
   objective: document.querySelector('#objective')!, energy: document.querySelector<HTMLElement>('#energy-bar')!,
   points: document.querySelector('#points')!, best: document.querySelector('#best')!, tasks: document.querySelector('#tasks')!,
@@ -29,7 +33,7 @@ const start = currentMap.spawns.find(({ id }) => id === 'start')!;
 const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, points: 0 };
 const camera = { x: Math.max(0, start.x - canvas.width / 2), y: Math.max(0, start.y - canvas.height / 2) };
 const keys = new Set<string>();
-let actionQueued = false, dialogueOpen = true, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
+let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 const state = {
   talked: false, inventory: [] as string[], delivered: false, bridge: false,
@@ -157,6 +161,7 @@ function move(dx: number, dy: number) {
   player.x = Math.max(5, Math.min(currentMap.size.w - player.w - 5, player.x)); player.y = Math.max(5, Math.min(currentMap.size.h - player.h - 5, player.y));
 }
 function update(dt: number) {
+  if (gamePhase !== 'playing') return;
   transitionCooldown = Math.max(0, transitionCooldown - dt); blockedSkillMessageCooldown = Math.max(0, blockedSkillMessageCooldown - dt);
   if (actionQueued) { actionQueued = false; interact(); }
   if (dialogueOpen || inspectionOpen) return;
@@ -275,8 +280,29 @@ function drawObjectiveArrow() {
   ctx.fillStyle = '#19301de8'; ctx.fillRect(labelX - labelWidth / 2, labelY - 14, labelWidth, 18);
   text(resolved.label, labelX, labelY, 11, '#fff3ae');
 }
+function drawTitleScreen() {
+  const { total, settled } = loadingProgress;
+  const ratio = total ? settled / total : 0;
+  const centerX = canvas.width / 2;
+  ctx.fillStyle = '#102d20'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#173b2a'; ctx.fillRect(36, 34, canvas.width - 72, canvas.height - 68);
+  ctx.strokeStyle = '#477c46'; ctx.lineWidth = 5; ctx.strokeRect(44, 42, canvas.width - 88, canvas.height - 84);
+  text('CAMP QUEST', centerX, 190, 54, '#ffd65a');
+  text('SERVICE CREW', centerX, 245, 40, '#fff8df');
+  text('Brigade Camp at Stony Glen', centerX, 285, 20, '#9bd16f');
+  ctx.fillStyle = '#081d13'; ctx.fillRect(centerX - 250, 345, 500, 30);
+  ctx.fillStyle = '#ffd65a'; ctx.fillRect(centerX - 244, 351, 488 * ratio, 18);
+  text(gamePhase === 'loading' ? `Loading ${settled}/${total}…` : 'Camp is ready!', centerX, 410, 18);
+  text(loadingTip, centerX, 460, 16, '#cde5b1');
+  if (gamePhase === 'ready') {
+    text('Tap to Start', centerX, 530, 28, '#ffd65a');
+    text('Press Enter, Space, or Click to Start', centerX, 565, 15, '#fff8df');
+  }
+}
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save(); ctx.translate(-camera.x, -camera.y);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (gamePhase !== 'playing') { drawTitleScreen(); return; }
+  ctx.save(); ctx.translate(-camera.x, -camera.y);
   drawGroundBackground();
   drawTerrainDecor();
   drawBelowActors();
@@ -285,11 +311,26 @@ function draw() {
   ctx.restore(); // DOM HUD, dialogue, inspection, and controls remain the UI/overlay layer.
   drawObjectiveArrow();
 }
+function startGame() {
+  if (gamePhase !== 'ready') return;
+  gamePhase = 'playing'; keys.clear(); actionQueued = false;
+  document.querySelector('#game-shell')!.classList.remove('title-phase');
+  showDialogue(mainCamp.npcs[0], dialogue.opening[0]); refreshUI();
+}
 
-let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (toastTimer > 0 && (toastTimer -= dt) <= 0) ui.toast.classList.add('hidden'); draw(); requestAnimationFrame(loop); }
+let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (gamePhase === 'playing' && toastTimer > 0 && (toastTimer -= dt) <= 0) ui.toast.classList.add('hidden'); draw(); requestAnimationFrame(loop); }
 const keyMap: Record<string, string> = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
-addEventListener('keydown', event => { if (keyMap[event.key]) { keys.add(keyMap[event.key]); event.preventDefault(); } if ([' ', 'e', 'E'].includes(event.key)) { actionQueued = true; event.preventDefault(); } if (event.key === 'Escape') { closeDialogue(); closeInspection(); } }); addEventListener('keyup', event => { if (keyMap[event.key]) keys.delete(keyMap[event.key]); });
-document.querySelectorAll<HTMLButtonElement>('[data-dir]').forEach(button => { const dir = button.dataset.dir!; const on = (event: Event) => { event.preventDefault(); keys.add(dir); button.classList.add('pressed'); }, off = () => { keys.delete(dir); button.classList.remove('pressed'); }; button.addEventListener('pointerdown', on); button.addEventListener('pointerup', off); button.addEventListener('pointercancel', off); button.addEventListener('pointerleave', off); });
+addEventListener('keydown', event => {
+  if (gamePhase !== 'playing') { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); startGame(); } return; }
+  if (keyMap[event.key]) { keys.add(keyMap[event.key]); event.preventDefault(); }
+  if ([' ', 'e', 'E'].includes(event.key)) { actionQueued = true; event.preventDefault(); }
+  if (event.key === 'Escape') { closeDialogue(); closeInspection(); }
+});
+addEventListener('keyup', event => { if (keyMap[event.key]) keys.delete(keyMap[event.key]); });
+canvas.addEventListener('pointerdown', event => { if (gamePhase !== 'playing') { event.preventDefault(); startGame(); } });
+document.querySelectorAll<HTMLButtonElement>('[data-dir]').forEach(button => { const dir = button.dataset.dir!; const on = (event: Event) => { event.preventDefault(); if (gamePhase !== 'playing') return; keys.add(dir); button.classList.add('pressed'); }, off = () => { keys.delete(dir); button.classList.remove('pressed'); }; button.addEventListener('pointerdown', on); button.addEventListener('pointerup', off); button.addEventListener('pointercancel', off); button.addEventListener('pointerleave', off); });
 document.querySelector('#close-inspection')!.addEventListener('click', closeInspection); ui.inspection.addEventListener('click', event => { if (event.target === ui.inspection) closeInspection(); });
-document.querySelector('#action-button')!.addEventListener('pointerdown', event => { event.preventDefault(); actionQueued = true; }); document.querySelector('#checklist-button')!.addEventListener('click', () => ui.checklist.classList.toggle('open')); document.querySelector('#close-checklist')!.addEventListener('click', () => ui.checklist.classList.remove('open'));
-showDialogue(mainCamp.npcs[0], dialogue.opening[0]); refreshUI(); requestAnimationFrame(loop);
+document.querySelector('#action-button')!.addEventListener('pointerdown', event => { event.preventDefault(); if (gamePhase === 'playing') actionQueued = true; }); document.querySelector('#checklist-button')!.addEventListener('click', () => { if (gamePhase === 'playing') ui.checklist.classList.toggle('open'); }); document.querySelector('#close-checklist')!.addEventListener('click', () => ui.checklist.classList.remove('open'));
+document.querySelector('#game-shell')!.classList.add('title-phase');
+refreshUI(); requestAnimationFrame(loop);
+assets.loadAll(npcPortraitPaths, progress => { loadingProgress = progress; }).then(() => { gamePhase = 'ready'; });

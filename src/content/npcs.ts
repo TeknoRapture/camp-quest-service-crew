@@ -10,3 +10,5 @@ export const npcs: NPCDefinition[] = [
   { id: 'crazyjoe', label: 'Crazy Joe', displayName: 'Crazy Joe', accent: '#cf6f38', dialogueId: 'crazyjoe', x: 3060, y: 2200, w: 28, h: 34 },
   { id: 'cliff', label: 'Cliff?', displayName: 'Cliff?', accent: '#684f78', dialogueId: 'cliff', x: 610, y: 390, w: 28, h: 34 },
 ];
+
+export const npcPortraitPaths = [...new Set([genericNpcPortrait, ...npcs.flatMap(({ portraits }) => Object.values(portraits ?? {}))])];

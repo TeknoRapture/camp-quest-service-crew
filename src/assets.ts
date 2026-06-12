@@ -21,6 +21,7 @@ export const assetPaths = {
 } as const;
 
 export type AssetId = keyof typeof assetPaths;
+export type AssetProgress = { total: number; settled: number; loaded: number; failed: number };
 
 type AssetRecord = {
   image: HTMLImageElement;
@@ -30,16 +31,28 @@ type AssetRecord = {
 };
 
 export class AssetLoader {
-  private assets = new Map<AssetId, AssetRecord>();
+  private assets = new Map<string, AssetRecord>();
+  private progressListener?: (progress: AssetProgress) => void;
 
   constructor(private readonly baseUrl = './') {}
 
-  url(id: AssetId) {
-    return `${this.baseUrl}${assetPaths[id]}`;
+  private resolve(path: string) { return `${this.baseUrl}${path}`; }
+
+  url(id: AssetId) { return this.resolve(assetPaths[id]); }
+
+  progress(): AssetProgress {
+    const records = [...this.assets.values()];
+    return {
+      total: records.length,
+      settled: records.filter(({ loaded, failed }) => loaded || failed).length,
+      loaded: records.filter(({ loaded }) => loaded).length,
+      failed: records.filter(({ failed }) => failed).length,
+    };
   }
 
-  load(id: AssetId) {
-    const existing = this.assets.get(id);
+  loadPath(path: string) {
+    const url = this.resolve(path);
+    const existing = this.assets.get(url);
     if (existing) return existing.promise;
 
     const image = new Image();
@@ -47,25 +60,33 @@ export class AssetLoader {
     record.promise = new Promise<HTMLImageElement>((resolve) => {
       image.onload = () => {
         record.loaded = true;
+        this.progressListener?.(this.progress());
         resolve(image);
       };
       image.onerror = () => {
         record.failed = true;
-        console.warn(`Camp Quest asset failed to load: ${this.url(id)}`);
+        console.warn(`Camp Quest asset failed to load: ${url}`);
+        this.progressListener?.(this.progress());
         resolve(image);
       };
     });
-    this.assets.set(id, record);
-    image.src = this.url(id);
+    this.assets.set(url, record);
+    image.src = url;
     return record.promise;
   }
 
-  loadAll(ids: AssetId[] = Object.keys(assetPaths) as AssetId[]) {
-    return Promise.all(ids.map((id) => this.load(id)));
+  load(id: AssetId) { return this.loadPath(assetPaths[id]); }
+
+  loadAll(extraPaths: string[] = [], onProgress?: (progress: AssetProgress) => void) {
+    this.progressListener = onProgress;
+    const paths = [...new Set([...Object.values(assetPaths), ...extraPaths])];
+    const promise = Promise.all(paths.map((path) => this.loadPath(path)));
+    this.progressListener?.(this.progress());
+    return promise;
   }
 
   get(id: AssetId) {
-    const asset = this.assets.get(id);
+    const asset = this.assets.get(this.url(id));
     return asset?.loaded && !asset.failed ? asset.image : undefined;
   }
 }
