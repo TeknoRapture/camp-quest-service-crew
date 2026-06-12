@@ -328,9 +328,26 @@ addEventListener('keydown', event => {
 });
 addEventListener('keyup', event => { if (keyMap[event.key]) keys.delete(keyMap[event.key]); });
 canvas.addEventListener('pointerdown', event => { if (gamePhase !== 'playing') { event.preventDefault(); startGame(); } });
-document.querySelectorAll<HTMLButtonElement>('[data-dir]').forEach(button => { const dir = button.dataset.dir!; const on = (event: Event) => { event.preventDefault(); if (gamePhase !== 'playing') return; keys.add(dir); button.classList.add('pressed'); }, off = () => { keys.delete(dir); button.classList.remove('pressed'); }; button.addEventListener('pointerdown', on); button.addEventListener('pointerup', off); button.addEventListener('pointercancel', off); button.addEventListener('pointerleave', off); });
+const directionButtons = document.querySelectorAll<HTMLButtonElement>('[data-dir]');
+const actionButton = document.querySelector<HTMLButtonElement>('#action-button')!;
+const preventControlDefault = (event: Event) => event.preventDefault();
+directionButtons.forEach(button => {
+  const dir = button.dataset.dir!;
+  const on = (event: PointerEvent) => { event.preventDefault(); if (gamePhase !== 'playing') return; keys.add(dir); button.classList.add('pressed'); };
+  const off = (event: PointerEvent) => { event.preventDefault(); keys.delete(dir); button.classList.remove('pressed'); };
+  button.addEventListener('pointerdown', on);
+  button.addEventListener('pointerup', off);
+  button.addEventListener('pointercancel', off);
+  button.addEventListener('pointerleave', off);
+  button.addEventListener('contextmenu', preventControlDefault);
+});
+actionButton.addEventListener('pointerdown', event => { event.preventDefault(); if (gamePhase === 'playing') actionQueued = true; });
+actionButton.addEventListener('pointerup', preventControlDefault);
+actionButton.addEventListener('pointercancel', preventControlDefault);
+actionButton.addEventListener('pointerleave', preventControlDefault);
+actionButton.addEventListener('contextmenu', preventControlDefault);
 document.querySelector('#close-inspection')!.addEventListener('click', closeInspection); ui.inspection.addEventListener('click', event => { if (event.target === ui.inspection) closeInspection(); });
-document.querySelector('#action-button')!.addEventListener('pointerdown', event => { event.preventDefault(); if (gamePhase === 'playing') actionQueued = true; }); document.querySelector('#checklist-button')!.addEventListener('click', () => { if (gamePhase === 'playing') ui.checklist.classList.toggle('open'); }); document.querySelector('#close-checklist')!.addEventListener('click', () => ui.checklist.classList.remove('open'));
+document.querySelector('#checklist-button')!.addEventListener('click', () => { if (gamePhase === 'playing') ui.checklist.classList.toggle('open'); }); document.querySelector('#close-checklist')!.addEventListener('click', () => ui.checklist.classList.remove('open'));
 document.querySelector('#game-shell')!.classList.add('title-phase');
 refreshUI(); requestAnimationFrame(loop);
 assets.loadAll(npcPortraitPaths, progress => { loadingProgress = progress; }).then(() => { gamePhase = 'ready'; });
