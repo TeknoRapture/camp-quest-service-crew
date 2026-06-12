@@ -238,7 +238,17 @@ function drawBelowActors() {
   const bridge = currentMap.interactables.find(({ id }) => id === 'blockedBridgeMessage'); if (bridge) { ctx.fillStyle = '#6d4b2f'; ctx.fillRect(bridge.x + 35, bridge.y + 35, 70, 95); if (!isBridgeUnlocked()) { ctx.fillStyle = '#d65b38'; for (let i = 0; i < 4; i++) ctx.fillRect(bridge.x + 40 + i * 18, bridge.y + 40, 9, 85); text('BRIDGE CLOSED · DAY 1', bridge.x + bridge.w / 2, bridge.y + bridge.h + 14, 12, '#ffd76d'); } }
   const teaser = currentMap.interactables.find(({ id }) => id === 'back40TeaserMessage'); if (teaser && isBridgeUnlocked()) { ctx.fillStyle = '#f5e6b8'; ctx.fillRect(teaser.x, teaser.y, teaser.w, teaser.h); ctx.strokeStyle = '#d65b38'; ctx.lineWidth = 4; ctx.strokeRect(teaser.x, teaser.y, teaser.w, teaser.h); text('UNDER CONSTRUCTION', teaser.x + teaser.w / 2, teaser.y + 27, 11, '#a43f28'); text('BACK 40 COMING SOON!', teaser.x + teaser.w / 2, teaser.y + 47, 10, '#a43f28'); }
   const cliffSign = currentMap.interactables.find(({ id }) => id === 'cliffSign'); if (cliffSign && !drawSprite(ctx, assets, 'cliffSign', cliffSign)) { ctx.fillStyle = '#fff'; ctx.fillRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.strokeRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); text('BEWARE', cliffSign.x + 37, cliffSign.y + 21, 10, '#e33'); text('of', cliffSign.x + 37, cliffSign.y + 38, 9, '#e33'); text('CLIFF!', cliffSign.x + 37, cliffSign.y + 57, 11, '#e33'); }
-  const flagpole = currentMap.interactables.find(({ id }) => id === 'flagpole'); if (flagpole) { ctx.fillStyle = '#d8dfd2'; ctx.fillRect(flagpole.x + 18, flagpole.y, 5, flagpole.h); ctx.fillStyle = '#f5e6b8'; ctx.fillRect(flagpole.x + 7, flagpole.y + flagpole.h - 8, 28, 8); ctx.fillStyle = '#d6533d'; ctx.beginPath(); ctx.moveTo(flagpole.x + 23, flagpole.y + 8); ctx.lineTo(flagpole.x + 60, flagpole.y + 20); ctx.lineTo(flagpole.x + 23, flagpole.y + 34); ctx.fill(); text('FLAGPOLE', flagpole.x + 21, flagpole.y + flagpole.h + 14, 10, '#fff3ae'); }
+  const flagpole = currentMap.interactables.find(({ id }) => id === 'flagpole'); if (flagpole) {
+    ctx.fillStyle = '#d8dfd2'; ctx.fillRect(flagpole.x + 18, flagpole.y, 5, flagpole.h);
+    ctx.fillStyle = '#f5e6b8'; ctx.fillRect(flagpole.x + 7, flagpole.y + flagpole.h - 8, 28, 8);
+    const flagX = flagpole.x + 23; const flagY = flagpole.y + 8; const flagW = 39; const stripeH = 4;
+    ctx.fillStyle = '#f4f0df'; ctx.fillRect(flagX, flagY, flagW, stripeH * 7);
+    ctx.fillStyle = '#c83f3f'; for (let stripe = 0; stripe < 7; stripe += 2) ctx.fillRect(flagX, flagY + stripe * stripeH, flagW, stripeH);
+    ctx.fillStyle = '#31538b'; ctx.fillRect(flagX, flagY, 16, stripeH * 4);
+    ctx.fillStyle = '#fff'; for (let starY = 0; starY < 3; starY++) for (let starX = 0; starX < 3; starX++) ctx.fillRect(flagX + 3 + starX * 5, flagY + 2 + starY * 5, 2, 2);
+    ctx.strokeStyle = '#8e3333'; ctx.lineWidth = 1; ctx.strokeRect(flagX, flagY, flagW, stripeH * 7);
+    text('FLAGPOLE', flagpole.x + 21, flagpole.y + flagpole.h + 14, 10, '#fff3ae');
+  }
   currentMap.interactables.filter(({ kind }) => kind === 'task-location').forEach(spot => { ctx.strokeStyle = '#f8e278'; ctx.lineWidth = 4; ctx.strokeRect(spot.x, spot.y, spot.w, spot.h); text(spot.label, spot.x + spot.w / 2, spot.y - 8, 10, '#fff3ae'); });
 }
 function drawActors() {
