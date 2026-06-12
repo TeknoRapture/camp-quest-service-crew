@@ -51,6 +51,10 @@ export const mainCamp: MapDefinition = {
     { x: 1450, y: 1210, w: 230, h: 58 },
     { x: 1790, y: 1210, w: 610, h: 58 },
     { x: 1450, y: 1210, w: 45, h: 390 },
+    // Keep the unlocked end-of-demo crossing confined to a small construction teaser.
+    { x: 1640, y: 1268, w: 40, h: 332 },
+    { x: 1790, y: 1268, w: 40, h: 332 },
+    { x: 1640, y: 1370, w: 190, h: 40 },
     blockedBridge,
   ],
   exits: [

@@ -12,4 +12,8 @@ export const interactables: InteractableDefinition[] = [
     id: 'blockedBridgeMessage', kind: 'message', label: 'Blocked Back 40 bridge', x: 1645, y: 1120, w: 180, h: 185,
     message: 'Back 40 is closed for now. Crazy Joe says Outdoor Challenge is not ready yet.',
   },
+  {
+    id: 'back40TeaserMessage', kind: 'message', label: 'Back 40 under-construction teaser', x: 1660, y: 1290, w: 150, h: 60,
+    message: 'Under Construction: Back 40 coming soon!',
+  },
 ];

@@ -3,6 +3,7 @@ import { AssetLoader, type AssetId } from './assets';
 import { drawSprite } from './sprites';
 import { dialogue } from './content/dialogue';
 import { maps, mainCamp } from './content/maps';
+import { blockedBridge } from './content/locations';
 import { genericNpcPortrait } from './content/npcs';
 import { skills } from './content/skills';
 import { tasks } from './content/tasks';
@@ -31,7 +32,7 @@ const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = true, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 const state = {
-  talked: false, inventory: [] as string[], delivered: false,
+  talked: false, inventory: [] as string[], delivered: false, bridge: false,
   skills: { nature: false, swimming: false, climbing: false } as Record<SkillId, boolean>,
 };
 const allItems = Object.values(maps).flatMap(map => map.items);
@@ -40,17 +41,27 @@ function buildingCollisionRect(building: LocationDefinition): Rect {
   const frontOverlap = Math.max(0, Math.min(building.h, building.frontOverlap ?? currentMap.buildingFrontOverlap ?? 0));
   return { x: building.x, y: building.y, w: building.w, h: building.h - frontOverlap };
 }
-function obstacles() { return [...currentMap.buildings.map(buildingCollisionRect), ...currentMap.walls]; }
+function areAllNonBridgeTasksComplete() { return tasks.filter(({ id }) => id !== 'bridge').every(({ id }) => isDone(id)); }
+function isBridgeUnlocked() { return areAllNonBridgeTasksComplete(); }
+function obstacles() { return [...currentMap.buildings.map(buildingCollisionRect), ...currentMap.walls.filter(wall => wall !== blockedBridge || !isBridgeUnlocked())]; }
 function hasSkill(skillId: SkillId) { return state.skills[skillId]; }
 function blockedTerrain() {
-  return currentMap.terrain.find(feature => feature.blocksMovement && intersects(player, feature) && (!feature.requiredSkill || !hasSkill(feature.requiredSkill)));
+  return currentMap.terrain.find(feature => {
+    if (!feature.blocksMovement || !intersects(player, feature) || (feature.requiredSkill && hasSkill(feature.requiredSkill))) return false;
+    const onUnlockedBridge = feature.id === 'back40Stream' && isBridgeUnlocked() && player.x >= blockedBridge.x && player.x + player.w <= blockedBridge.x + blockedBridge.w;
+    return !onUnlockedBridge;
+  });
 }
 function showMissingTerrainSkill(feature: TerrainFeature) {
   if (blockedSkillMessageCooldown > 0 && lastBlockedTerrainId === feature.id) return;
   const message = feature.missingSkillMessage ?? (feature.requiredSkill ? skills[feature.requiredSkill].missingSkillMessage : 'That terrain is blocked.');
   toast(message); blockedSkillMessageCooldown = 1.25; lastBlockedTerrainId = feature.id;
 }
-function isDone(id: string) { return id === 'talked' || id === 'delivered' ? state[id] : id === 'bridge' ? false : allItems.find(item => item.id === id)?.done; }
+function isDone(id: string) { return id === 'talked' || id === 'delivered' || id === 'bridge' ? state[id] : allItems.find(item => item.id === id)?.done; }
+function completeBridgeObjective() {
+  if (state.bridge || !isBridgeUnlocked()) return;
+  state.bridge = true; award(50); toast('Under Construction: Back 40 coming soon! +50 SP'); refreshUI();
+}
 function activeTask() { return tasks.find(({ id }) => !isDone(id)); }
 function objective() { return activeTask()?.label ?? 'Report to the Rally Circle'; }
 function resolveObjectiveTarget(task: TaskDefinition) {
@@ -115,8 +126,12 @@ function interact() {
     if (nearbyInteractable.kind === 'inspection' && nearbyInteractable.title && nearbyInteractable.assetId) {
       inspectImage(nearbyInteractable.title, nearbyInteractable.assetId, nearbyInteractable.caption ?? nearbyInteractable.label); return;
     }
+    if (nearbyInteractable.id === 'back40TeaserMessage') { completeBridgeObjective(); return; }
     if (nearbyInteractable.kind === 'message' || nearbyInteractable.kind === 'task-location') {
-      toast(nearbyInteractable.message ?? nearbyInteractable.label); return;
+      const message = nearbyInteractable.id === 'blockedBridgeMessage' && isBridgeUnlocked()
+        ? 'The bridge inspection is complete. Cross carefully for a tiny peek at the Back 40!'
+        : nearbyInteractable.message ?? nearbyInteractable.label;
+      toast(message); return;
     }
     if (nearbyInteractable.kind === 'delivery-zone' && state.inventory.includes('crate') && !state.delivered) {
       state.delivered = true; state.inventory = state.inventory.filter(id => id !== 'crate'); award(100); toast('Crate delivered! +100 SP'); refreshUI(); return;
@@ -148,6 +163,8 @@ function update(dt: number) {
   const x = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0), y = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0); const len = Math.hypot(x, y) || 1;
   const hazard = currentMap.hazards.find(item => intersects(player, item)); const speed = player.speed * (hazard && hazard.kind !== 'mosquitoes' ? .55 : 1); move(x / len * speed * dt, y / len * speed * dt);
   if (tryAutomaticExit()) return;
+  const bridgeTeaser = currentMap.interactables.find(({ id }) => id === 'back40TeaserMessage');
+  if (bridgeTeaser && intersects(player, bridgeTeaser)) completeBridgeObjective();
   hazardTick -= dt;
   if (hazard?.energyDamage && hazardTick <= 0) {
     const multiplier = hazard.mitigationSkill && hasSkill(hazard.mitigationSkill) ? hazard.mitigationMultiplier ?? 1 : 1;
@@ -171,7 +188,16 @@ function drawBuildingBody(building: LocationDefinition) {
   const door = building.doorway;
   if (door?.side === 'bottom') { const depth = door.depth ?? 40; ctx.fillRect(building.x + door.offset, building.y + building.h - depth, door.width, depth); }
   else ctx.fillRect(building.x + building.w / 2 - 15, building.y + building.h - 40, 30, 40);
-  text(building.label, building.x + building.w / 2, building.y + building.h + 18, 12);
+}
+function drawBuildingSign(building: LocationDefinition) {
+  const fontSize = 11, paddingX = 7, signHeight = 19;
+  ctx.font = `900 ${fontSize}px Nunito`;
+  const signWidth = ctx.measureText(building.label).width + paddingX * 2;
+  const signX = building.x + (building.w - signWidth) / 2;
+  const signY = building.y + 9;
+  ctx.fillStyle = '#f5e6b8'; ctx.fillRect(signX, signY, signWidth, signHeight);
+  ctx.strokeStyle = '#6b4a2d'; ctx.lineWidth = 2; ctx.strokeRect(signX, signY, signWidth, signHeight);
+  text(building.label, building.x + building.w / 2, signY + 14, fontSize, '#4a2d1d');
 }
 function drawBuildingRoof(building: LocationDefinition) {
   ctx.fillStyle = '#4d2e20'; ctx.beginPath();
@@ -188,7 +214,8 @@ function drawTerrainDecor() {
 }
 function drawBelowActors() {
   currentMap.buildings.forEach(drawBuildingBody);
-  const bridge = currentMap.interactables.find(({ id }) => id === 'blockedBridgeMessage'); if (bridge) { ctx.fillStyle = '#6d4b2f'; ctx.fillRect(bridge.x + 35, bridge.y + 35, 70, 95); ctx.fillStyle = '#d65b38'; for (let i = 0; i < 4; i++) ctx.fillRect(bridge.x + 40 + i * 18, bridge.y + 40, 9, 85); text('BRIDGE CLOSED · DAY 1', bridge.x + bridge.w / 2, bridge.y + bridge.h + 14, 12, '#ffd76d'); }
+  const bridge = currentMap.interactables.find(({ id }) => id === 'blockedBridgeMessage'); if (bridge) { ctx.fillStyle = '#6d4b2f'; ctx.fillRect(bridge.x + 35, bridge.y + 35, 70, 95); if (!isBridgeUnlocked()) { ctx.fillStyle = '#d65b38'; for (let i = 0; i < 4; i++) ctx.fillRect(bridge.x + 40 + i * 18, bridge.y + 40, 9, 85); text('BRIDGE CLOSED · DAY 1', bridge.x + bridge.w / 2, bridge.y + bridge.h + 14, 12, '#ffd76d'); } }
+  const teaser = currentMap.interactables.find(({ id }) => id === 'back40TeaserMessage'); if (teaser && isBridgeUnlocked()) { ctx.fillStyle = '#f5e6b8'; ctx.fillRect(teaser.x, teaser.y, teaser.w, teaser.h); ctx.strokeStyle = '#d65b38'; ctx.lineWidth = 4; ctx.strokeRect(teaser.x, teaser.y, teaser.w, teaser.h); text('UNDER CONSTRUCTION', teaser.x + teaser.w / 2, teaser.y + 27, 11, '#a43f28'); text('BACK 40 COMING SOON!', teaser.x + teaser.w / 2, teaser.y + 47, 10, '#a43f28'); }
   const cliffSign = currentMap.interactables.find(({ id }) => id === 'cliffSign'); if (cliffSign && !drawSprite(ctx, assets, 'cliffSign', cliffSign)) { ctx.fillStyle = '#fff'; ctx.fillRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.strokeRect(cliffSign.x, cliffSign.y, cliffSign.w, 92); text('BEWARE', cliffSign.x + 37, cliffSign.y + 21, 10, '#e33'); text('of', cliffSign.x + 37, cliffSign.y + 38, 9, '#e33'); text('CLIFF!', cliffSign.x + 37, cliffSign.y + 57, 11, '#e33'); }
   currentMap.interactables.filter(({ kind }) => kind === 'task-location').forEach(spot => { ctx.strokeStyle = '#f8e278'; ctx.lineWidth = 4; ctx.strokeRect(spot.x, spot.y, spot.w, spot.h); text(spot.label, spot.x + spot.w / 2, spot.y - 8, 10, '#fff3ae'); });
 }
@@ -200,6 +227,7 @@ function drawActors() {
 }
 function drawAboveActors() {
   if (currentMap.terrainStyle === 'outdoor') currentMap.buildings.forEach(drawBuildingRoof);
+  currentMap.buildings.forEach(drawBuildingSign);
 }
 function drawObjectiveArrow() {
   if (dialogueOpen || inspectionOpen) return;
