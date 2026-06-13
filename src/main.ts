@@ -385,7 +385,14 @@ actionButton.addEventListener('pointercancel', preventControlDefault);
 actionButton.addEventListener('pointerleave', preventControlDefault);
 actionButton.addEventListener('contextmenu', preventControlDefault);
 document.querySelector('#close-inspection')!.addEventListener('click', closeInspection); ui.inspection.addEventListener('click', event => { if (event.target === ui.inspection) closeInspection(); });
-document.querySelector('#checklist-button')!.addEventListener('click', () => { if (gamePhase === 'playing') ui.checklist.classList.toggle('open'); }); document.querySelector('#close-checklist')!.addEventListener('click', () => ui.checklist.classList.remove('open'));
+const checklistButton = document.querySelector<HTMLButtonElement>('#checklist-button')!;
+const setChecklistOpen = (open: boolean) => {
+  ui.checklist.classList.toggle('open', open);
+  ui.checklist.setAttribute('aria-hidden', String(!open));
+  checklistButton.setAttribute('aria-expanded', String(open));
+};
+checklistButton.addEventListener('click', () => { if (gamePhase === 'playing') setChecklistOpen(!ui.checklist.classList.contains('open')); });
+document.querySelector('#close-checklist')!.addEventListener('click', () => setChecklistOpen(false));
 const clearHeldDirections = () => { keys.clear(); directionButtons.forEach(button => button.classList.remove('pressed')); };
 addEventListener('resize', clearHeldDirections);
 addEventListener('orientationchange', clearHeldDirections);
