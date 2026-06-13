@@ -27,7 +27,7 @@
         <section class="objective"><b>NOW:</b> <span id="objective">Talk to Coop</span></section>
         <div class="play-area">
           <canvas id="game" width="960" height="640" aria-label="Camp Quest game map"></canvas>
-          <aside id="checklist" class="checklist">
+          <aside id="checklist" class="checklist" aria-hidden="true">
             <button id="close-checklist" aria-label="Close checklist">×</button>
             <h2>Service Checklist</h2><p>DAY 1 · MAIN CAMP</p><ul id="tasks"></ul>
           </aside>
@@ -52,7 +52,7 @@
       <section class="right-control-gutter" aria-label="Action controls">
         <button id="action-button" class="round action">ACTION<small>talk · grab · deliver</small></button>
         <button id="drop-button" class="round secondary drop" disabled>DROP<small>Q</small></button>
-        <button id="checklist-button" class="round secondary">LIST</button>
+        <button id="checklist-button" class="round secondary" aria-expanded="false" aria-controls="checklist">LIST</button>
       </section>
       <footer>Move with the D-pad or WASD / arrows · Action with Space or E · Drop bulky item with Q</footer>
       <aside id="portrait-guidance" class="portrait-guidance">
