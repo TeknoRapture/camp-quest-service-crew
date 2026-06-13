@@ -8,54 +8,58 @@
   </head>
   <body>
     <main id="game-shell">
-      <header class="hud">
-        <div class="brand"><span>☀</span><strong>Camp Quest</strong><small>Service Crew</small></div>
-        <div class="meters">
-          <div><span>ENERGY</span><div class="energy-track"><i id="energy-bar"></i></div></div>
-          <b id="points">0 SP</b><small id="best">BEST 0</small>
-        </div>
-      </header>
-      <section class="objective"><b>NOW:</b> <span id="objective">Talk to Coop</span></section>
-      <section id="carry-summary" class="carry-summary">Hands: empty | empty</section>
-      <div class="play-area">
-        <canvas id="game" width="960" height="640" aria-label="Camp Quest game map"></canvas>
-        <aside id="checklist" class="checklist">
-          <button id="close-checklist" aria-label="Close checklist">×</button>
-          <h2>Service Checklist</h2><p>DAY 1 · MAIN CAMP</p><ul id="tasks"></ul>
-        </aside>
-        <div id="dialogue" class="dialogue hidden" role="dialog" aria-live="polite">
-          <div id="portrait-panel" class="portrait-panel">
-            <img id="dialogue-portrait" alt="" />
-          </div>
-          <div class="dialogue-copy">
-            <b id="speaker"></b>
-            <p id="dialogue-text"></p>
-            <small>Tap ACTION to continue</small>
-          </div>
-        </div>
-        <div id="toast" class="toast hidden"></div>
-        <div id="image-inspection" class="image-inspection hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
-          <figure class="inspection-card">
-            <button id="close-inspection" class="inspection-close" aria-label="Close image inspection">×</button>
-            <h2 id="inspection-title"></h2>
-            <img id="inspection-image" alt="" />
-            <div id="inspection-fallback" class="inspection-fallback hidden" role="img" aria-label="Image unavailable placeholder">Image unavailable</div>
-            <figcaption id="inspection-caption"></figcaption>
-          </figure>
-        </div>
-      </div>
-      <section class="controls" aria-label="Touch controls">
+      <section class="left-control-gutter" aria-label="Movement controls">
         <div class="dpad">
           <button data-dir="up" aria-label="Move up">▲</button>
           <button data-dir="left" aria-label="Move left">◀</button>
           <button data-dir="down" aria-label="Move down">▼</button>
           <button data-dir="right" aria-label="Move right">▶</button>
         </div>
-        <button id="checklist-button" class="round secondary">LIST</button>
-        <button id="drop-button" class="round secondary drop" disabled>DROP<small>Q</small></button>
+      </section>
+      <section class="center-stage">
+        <header class="hud">
+          <div class="brand"><span>☀</span><strong>Camp Quest</strong><small>Service Crew</small></div>
+          <div class="meters">
+            <div><span>ENERGY</span><div class="energy-track"><i id="energy-bar"></i></div></div>
+            <b id="points">0 SP</b><small id="best">BEST 0</small>
+          </div>
+        </header>
+        <section class="objective"><b>NOW:</b> <span id="objective">Talk to Coop</span></section>
+        <div class="play-area">
+          <canvas id="game" width="960" height="640" aria-label="Camp Quest game map"></canvas>
+          <aside id="checklist" class="checklist">
+            <button id="close-checklist" aria-label="Close checklist">×</button>
+            <h2>Service Checklist</h2><p>DAY 1 · MAIN CAMP</p><ul id="tasks"></ul>
+          </aside>
+          <div id="dialogue" class="dialogue hidden" role="dialog" aria-live="polite">
+            <div id="portrait-panel" class="portrait-panel"><img id="dialogue-portrait" alt="" /></div>
+            <div class="dialogue-copy">
+              <b id="speaker"></b><p id="dialogue-text"></p><small>Tap ACTION to continue</small>
+            </div>
+          </div>
+          <div id="toast" class="toast hidden"></div>
+          <div id="image-inspection" class="image-inspection hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
+            <figure class="inspection-card">
+              <button id="close-inspection" class="inspection-close" aria-label="Close image inspection">×</button>
+              <h2 id="inspection-title"></h2><img id="inspection-image" alt="" />
+              <div id="inspection-fallback" class="inspection-fallback hidden" role="img" aria-label="Image unavailable placeholder">Image unavailable</div>
+              <figcaption id="inspection-caption"></figcaption>
+            </figure>
+          </div>
+        </div>
+        <section id="carry-summary" class="carry-summary">Hands: empty | empty</section>
+      </section>
+      <section class="right-control-gutter" aria-label="Action controls">
         <button id="action-button" class="round action">ACTION<small>talk · grab · deliver</small></button>
+        <button id="drop-button" class="round secondary drop" disabled>DROP<small>Q</small></button>
+        <button id="checklist-button" class="round secondary">LIST</button>
       </section>
       <footer>Move with the D-pad or WASD / arrows · Action with Space or E · Drop bulky item with Q</footer>
+      <aside id="portrait-guidance" class="portrait-guidance">
+        <strong>Rotate your phone for the best camp chaos.</strong>
+        <span>Portrait play still works if you need it.</span>
+        <button id="dismiss-portrait-guidance">Keep playing</button>
+      </aside>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
