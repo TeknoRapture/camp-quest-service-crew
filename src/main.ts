@@ -26,6 +26,7 @@ const ui = {
   inspection: document.querySelector('#image-inspection')!, inspectionImage: document.querySelector<HTMLImageElement>('#inspection-image')!,
   inspectionTitle: document.querySelector('#inspection-title')!, inspectionCaption: document.querySelector('#inspection-caption')!,
   inspectionFallback: document.querySelector('#inspection-fallback')!,
+  carrySummary: document.querySelector('#carry-summary')!, dropButton: document.querySelector<HTMLButtonElement>('#drop-button')!,
 };
 
 let currentMap: MapDefinition = mainCamp;
@@ -36,10 +37,20 @@ const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 const state = {
-  talked: false, inventory: [] as string[], delivered: false, bridge: false,
+  talked: false, inventory: { items: {} as Record<string, number> }, largePickupOrder: [] as string[], rewardedPickups: new Set<string>(), delivered: false, bridge: false,
   skills: { nature: false, swimming: false, climbing: false } as Record<SkillId, boolean>,
 };
 const allItems = Object.values(maps).flatMap(map => map.items);
+const itemById = (id: string) => allItems.find(item => item.id === id);
+const itemCount = (id: string) => state.inventory.items[id] ?? 0;
+const hasItem = (id: string) => itemCount(id) > 0;
+const carryType = (id: string) => itemById(id)?.carryType ?? 'small';
+const carrySize = (id: string) => itemById(id)?.carrySize ?? 1;
+const largeUnitsUsed = () => Object.entries(state.inventory.items).reduce((sum, [id, quantity]) => sum + (carryType(id) === 'large' ? carrySize(id) * quantity : 0), 0);
+function canCarry(id: string) { return carryType(id) !== 'large' || largeUnitsUsed() + carrySize(id) <= 2; }
+function addItem(id: string) { state.inventory.items[id] = itemCount(id) + 1; if (carryType(id) === 'large') state.largePickupOrder.push(id); }
+function removeItem(id: string) { if (itemCount(id) <= 1) delete state.inventory.items[id]; else state.inventory.items[id]--; state.largePickupOrder = state.largePickupOrder.filter(carriedId => carriedId !== id || hasItem(id)); }
+function visibleLabels(type: 'large' | 'tray' | 'small') { return Object.entries(state.inventory.items).flatMap(([id, quantity]) => { const item = itemById(id); if (!item || carryType(id) !== type || item.displayInInventory === false) return []; return Array(quantity).fill(item.inventoryLabel ?? item.label); }); }
 
 function buildingCollisionRect(building: LocationDefinition): Rect {
   const frontOverlap = Math.max(0, Math.min(building.h, building.frontOverlap ?? currentMap.buildingFrontOverlap ?? 0));
@@ -84,6 +95,10 @@ function refreshUI() {
   const best = Number(localStorage.getItem('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
   ui.objective.textContent = `${currentMap.displayName}: ${objective()}`;
   ui.tasks.innerHTML = tasks.map(({ id, label }) => `<li class="${isDone(id) ? 'done' : ''}">${label}</li>`).join('');
+  const large = visibleLabels('large'), tray = visibleLabels('tray'), small = visibleLabels('small');
+  const hands = large.length === 1 && carrySize(state.largePickupOrder.at(-1) ?? '') === 2 ? `${large[0]} (both hands)` : `${large[0] ?? 'empty'} | ${large[1] ?? 'empty'}`;
+  ui.carrySummary.textContent = [`Hands: ${hands}`, tray.length ? `Tray: ${tray.join(', ')}` : '', small.length ? `Small: ${small.join(', ')}` : ''].filter(Boolean).join(' · ');
+  ui.dropButton.disabled = state.largePickupOrder.length === 0;
 }
 function showDialogue(speaker: DialogueSpeaker, text: string) {
   const displayName = speaker.displayName ?? speaker.label ?? 'Camp Staff';
@@ -137,8 +152,8 @@ function interact() {
         : nearbyInteractable.message ?? nearbyInteractable.label;
       toast(message); return;
     }
-    if (nearbyInteractable.kind === 'delivery-zone' && state.inventory.includes('crate') && !state.delivered) {
-      state.delivered = true; state.inventory = state.inventory.filter(id => id !== 'crate'); award(100); toast('Crate delivered! +100 SP'); refreshUI(); return;
+    if (nearbyInteractable.kind === 'delivery-zone' && hasItem('crate') && !state.delivered) {
+      state.delivered = true; removeItem('crate'); award(100); toast('Crate delivered! +100 SP'); refreshUI(); return;
     }
   }
   const npc = currentMap.npcs.filter(({ id }) => id !== 'cliff').sort((a, b) => dist(player, a) - dist(player, b))[0];
@@ -147,8 +162,19 @@ function interact() {
     showDialogue(npc, dialogue[npc.dialogueId][state.talked ? 1 : 0]); refreshUI(); return;
   }
   const item = currentMap.items.filter(({ done }) => !done).sort((a, b) => dist(player, a) - dist(player, b))[0];
-  if (item && dist(player, item) < 70) { item.done = true; state.inventory.push(item.id); award(50); toast(`${item.label} recovered! +50 SP`); refreshUI(); return; }
+  if (item && dist(player, item) < 70) {
+    if (!canCarry(item.id)) { toast(carrySize(item.id) === 2 ? 'That takes both hands, champ. Set down a bulky supply first.' : 'Your hands are full! Set down a bulky supply first.'); return; }
+    item.done = true; addItem(item.id);
+    const firstPickup = !state.rewardedPickups.has(item.id); if (firstPickup) { state.rewardedPickups.add(item.id); award(50); }
+    toast(`${item.label} recovered!${firstPickup ? ' +50 SP' : ''}`); refreshUI(); return;
+  }
   toast('Nothing useful nearby. Service Crew Rule #2: check the weirdest place first.');
+}
+function dropLastLargeItem() {
+  const id = state.largePickupOrder.at(-1); if (!id) { toast('No bulky supply to set down.'); return; }
+  const item = itemById(id); if (!item) return;
+  removeItem(id); item.done = false; item.x = Math.max(5, Math.min(currentMap.size.w - item.w - 5, player.x + player.w + 18)); item.y = Math.max(5, Math.min(currentMap.size.h - item.h - 5, player.y));
+  toast(`${item.inventoryLabel ?? item.label} set down. Your mighty Service Crew arms thank you.`); refreshUI();
 }
 function move(dx: number, dy: number) {
   const old = { x: player.x, y: player.y };
@@ -333,6 +359,7 @@ const keyMap: Record<string, string> = { ArrowUp: 'up', w: 'up', W: 'up', ArrowD
 addEventListener('keydown', event => {
   if (gamePhase !== 'playing') { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); startGame(); } return; }
   if (keyMap[event.key]) { keys.add(keyMap[event.key]); event.preventDefault(); }
+  if (['q', 'Q'].includes(event.key)) { dropLastLargeItem(); event.preventDefault(); }
   if ([' ', 'e', 'E'].includes(event.key)) { actionQueued = true; event.preventDefault(); }
   if (event.key === 'Escape') { closeDialogue(); closeInspection(); }
 });
@@ -351,6 +378,7 @@ directionButtons.forEach(button => {
   button.addEventListener('pointerleave', off);
   button.addEventListener('contextmenu', preventControlDefault);
 });
+ui.dropButton.addEventListener('pointerdown', event => { event.preventDefault(); if (gamePhase === 'playing') dropLastLargeItem(); });
 actionButton.addEventListener('pointerdown', event => { event.preventDefault(); if (gamePhase === 'playing') actionQueued = true; });
 actionButton.addEventListener('pointerup', preventControlDefault);
 actionButton.addEventListener('pointercancel', preventControlDefault);

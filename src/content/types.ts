@@ -23,6 +23,11 @@ export interface SkillDefinition { id: SkillId; label: string; missingSkillMessa
 export interface ItemDefinition extends Thing {
   assetId?: AssetId;
   description?: string;
+  carryType?: 'large' | 'tray' | 'small';
+  carrySize?: 1 | 2;
+  stackLimit?: number;
+  inventoryLabel?: string;
+  displayInInventory?: boolean;
   /** Future-ready cleaning rule metadata; the current pickup-only gameplay does not enforce item use. */
   useRestriction?: 'bathroom-only' | 'normal-floor-only';
 }
