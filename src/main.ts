@@ -347,8 +347,15 @@ function draw() {
   ctx.restore(); // DOM HUD, dialogue, inspection, and controls remain the UI/overlay layer.
   drawObjectiveArrow();
 }
+function requestGameFullscreen() {
+  if (document.fullscreenElement) return;
+  const target = document.querySelector<HTMLElement>('#game-shell') ?? document.documentElement;
+  if (!target.requestFullscreen) return;
+  target.requestFullscreen().catch(() => console.debug('Fullscreen request was not available.'));
+}
 function startGame() {
   if (gamePhase !== 'ready') return;
+  requestGameFullscreen();
   gamePhase = 'playing'; keys.clear(); actionQueued = false;
   document.querySelector('#game-shell')!.classList.remove('title-phase');
   showDialogue(mainCamp.npcs[0], dialogue.opening[0]); refreshUI();
