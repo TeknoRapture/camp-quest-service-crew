@@ -27,6 +27,7 @@ const ui = {
   inspectionTitle: document.querySelector('#inspection-title')!, inspectionCaption: document.querySelector('#inspection-caption')!,
   inspectionFallback: document.querySelector('#inspection-fallback')!,
   carrySummary: document.querySelector('#carry-summary')!, dropButton: document.querySelector<HTMLButtonElement>('#drop-button')!,
+  fullscreenButton: document.querySelector<HTMLButtonElement>('#fullscreen-button')!,
 };
 
 let currentMap: MapDefinition = mainCamp;
@@ -347,11 +348,19 @@ function draw() {
   ctx.restore(); // DOM HUD, dialogue, inspection, and controls remain the UI/overlay layer.
   drawObjectiveArrow();
 }
-function requestGameFullscreen() {
-  if (document.fullscreenElement) return;
+async function requestGameFullscreen(showFailureMessage = false) {
+  if (document.fullscreenElement) {
+    try { await document.exitFullscreen(); } catch { if (showFailureMessage) toast('Could not exit fullscreen. Keep questing!'); }
+    return;
+  }
   const target = document.querySelector<HTMLElement>('#game-shell') ?? document.documentElement;
-  if (!target.requestFullscreen) return;
-  target.requestFullscreen().catch(() => console.debug('Fullscreen request was not available.'));
+  if (!target.requestFullscreen) { if (showFailureMessage) toast('Fullscreen is unavailable here. Keep questing!'); return; }
+  try { await target.requestFullscreen(); } catch { if (showFailureMessage) toast('Fullscreen was not allowed. Keep questing!'); }
+}
+function updateFullscreenButtonState() {
+  const isFullscreen = Boolean(document.fullscreenElement);
+  ui.fullscreenButton.textContent = isFullscreen ? 'Exit Fullscreen' : '⛶ Fullscreen';
+  ui.fullscreenButton.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
 }
 function startGame() {
   if (gamePhase !== 'ready') return;
@@ -391,6 +400,8 @@ actionButton.addEventListener('pointerup', preventControlDefault);
 actionButton.addEventListener('pointercancel', preventControlDefault);
 actionButton.addEventListener('pointerleave', preventControlDefault);
 actionButton.addEventListener('contextmenu', preventControlDefault);
+ui.fullscreenButton.addEventListener('click', () => requestGameFullscreen(true));
+document.addEventListener('fullscreenchange', updateFullscreenButtonState);
 document.querySelector('#close-inspection')!.addEventListener('click', closeInspection); ui.inspection.addEventListener('click', event => { if (event.target === ui.inspection) closeInspection(); });
 const checklistButton = document.querySelector<HTMLButtonElement>('#checklist-button')!;
 const setChecklistOpen = (open: boolean) => {
