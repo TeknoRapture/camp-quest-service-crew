@@ -33,7 +33,15 @@ const ui = {
 let currentMap: MapDefinition = mainCamp;
 const start = currentMap.spawns.find(({ id }) => id === 'start')!;
 const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, points: 0 };
-const camera = { x: Math.max(0, start.x - canvas.width / 2), y: Math.max(0, start.y - canvas.height / 2) };
+const camera = { x: 0, y: 0 };
+function clampCameraAxis(mapSize: number, viewportSize: number, desired: number) {
+  if (mapSize <= viewportSize) return (mapSize - viewportSize) / 2;
+  return Math.max(0, Math.min(mapSize - viewportSize, desired));
+}
+function updateCamera() {
+  camera.x = clampCameraAxis(currentMap.size.w, canvas.width, player.x + player.w / 2 - canvas.width / 2);
+  camera.y = clampCameraAxis(currentMap.size.h, canvas.height, player.y + player.h / 2 - canvas.height / 2);
+}
 const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
@@ -138,7 +146,7 @@ function switchMap(exit: InteractableDefinition) {
   const spawn = nextMap?.spawns.find(({ id }) => id === exit.targetSpawnId);
   if (!nextMap || !spawn) { toast('That route is not ready yet.'); return; }
   currentMap = nextMap; player.x = spawn.x; player.y = spawn.y; keys.clear(); transitionCooldown = .45;
-  camera.x = 0; camera.y = 0; toast(`Entered ${currentMap.displayName}`); refreshUI();
+  updateCamera(); toast(`Entered ${currentMap.displayName}`); refreshUI();
 }
 function tryAutomaticExit() {
   if (transitionCooldown > 0) return false;
@@ -216,8 +224,7 @@ function update(dt: number) {
     const damage = hazard.energyDamage * multiplier; player.energy = Math.max(0, player.energy - damage); hazardTick = hazard.damageInterval ?? .5;
     toast(`${hazard.damageMessage ?? hazard.label} Energy -${damage}`); refreshUI();
   }
-  camera.x = Math.max(0, Math.min(Math.max(0, currentMap.size.w - canvas.width), player.x - canvas.width / 2));
-  camera.y = Math.max(0, Math.min(Math.max(0, currentMap.size.h - canvas.height), player.y - canvas.height / 2));
+  updateCamera();
 }
 function text(value: string, x: number, y: number, size = 13, color = '#fff8df') { ctx.font = `900 ${size}px Nunito`; ctx.textAlign = 'center'; ctx.fillStyle = '#19301d'; ctx.fillText(value, x + 1, y + 1); ctx.fillStyle = color; ctx.fillText(value, x, y); }
 function drawTree(x: number, y: number) { ctx.fillStyle = '#543b21'; ctx.fillRect(x - 4, y + 10, 8, 18); ctx.fillStyle = '#285c30'; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7); ctx.fill(); ctx.fillStyle = '#36733a'; ctx.beginPath(); ctx.arc(x - 7, y - 7, 11, 0, 7); ctx.fill(); }
@@ -374,6 +381,7 @@ function updateFullscreenButtonState() {
   const isFullscreen = Boolean(document.fullscreenElement);
   ui.fullscreenButton.textContent = isFullscreen ? 'Exit Fullscreen' : '⛶ Fullscreen';
   ui.fullscreenButton.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
+  updateCamera();
 }
 function startGame() {
   if (gamePhase !== 'ready') return;
@@ -424,10 +432,10 @@ const setChecklistOpen = (open: boolean) => {
 };
 checklistButton.addEventListener('click', () => { if (gamePhase === 'playing') setChecklistOpen(!ui.checklist.classList.contains('open')); });
 document.querySelector('#close-checklist')!.addEventListener('click', () => setChecklistOpen(false));
-const clearHeldDirections = () => { keys.clear(); directionButtons.forEach(button => button.classList.remove('pressed')); };
+const clearHeldDirections = () => { keys.clear(); directionButtons.forEach(button => button.classList.remove('pressed')); updateCamera(); };
 addEventListener('resize', clearHeldDirections);
 addEventListener('orientationchange', clearHeldDirections);
 document.querySelector('#dismiss-portrait-guidance')!.addEventListener('click', () => document.querySelector('#portrait-guidance')!.classList.add('dismissed'));
 document.querySelector('#game-shell')!.classList.add('title-phase');
-refreshUI(); requestAnimationFrame(loop);
+updateCamera(); refreshUI(); requestAnimationFrame(loop);
 assets.loadAll(npcPortraitPaths, progress => { loadingProgress = progress; }).then(() => { gamePhase = 'ready'; });
