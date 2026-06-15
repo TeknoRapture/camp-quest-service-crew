@@ -7,8 +7,8 @@ import { chooseLoadingTip } from './content/loadingTips';
 import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
-import { tasks } from './content/tasks';
-import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, ObjectiveTargetType, Rect, SkillId, TaskDefinition, TerrainFeature, Thing } from './content/types';
+import { morningSupplyScrambleQuest, quests } from './content/tasks';
+import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, ObjectiveDefinition, ObjectiveTargetType, Rect, SkillId, TerrainFeature, Thing } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
@@ -39,6 +39,7 @@ let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTim
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 const state = {
   talked: false, inventory: { items: {} as Record<string, number> }, largePickupOrder: [] as string[], rewardedPickups: new Set<string>(), delivered: false, bridge: false,
+  quests: { activeQuestIds: new Set<string>([morningSupplyScrambleQuest.id]), completedObjectiveIds: new Set<string>(), completedQuestIds: new Set<string>() },
   skills: { nature: false, swimming: false, climbing: false } as Record<SkillId, boolean>,
 };
 const allItems = Object.values(maps).flatMap(map => map.items);
@@ -57,7 +58,7 @@ function buildingCollisionRect(building: LocationDefinition): Rect {
   const frontOverlap = Math.max(0, Math.min(building.h, building.frontOverlap ?? currentMap.buildingFrontOverlap ?? 0));
   return { x: building.x, y: building.y, w: building.w, h: building.h - frontOverlap };
 }
-function areAllNonBridgeTasksComplete() { return tasks.filter(({ id }) => id !== 'bridge').every(({ id }) => isDone(id)); }
+function areAllNonBridgeTasksComplete() { return morningSupplyScrambleQuest.objectives.filter(({ id }) => id !== 'bridge').every(({ id }) => isObjectiveComplete(id)); }
 function isBridgeUnlocked() { return areAllNonBridgeTasksComplete(); }
 function obstacles() { return [...currentMap.buildings.map(buildingCollisionRect), ...currentMap.walls.filter(wall => wall !== blockedBridge || !isBridgeUnlocked())]; }
 function hasSkill(skillId: SkillId) { return state.skills[skillId]; }
@@ -73,14 +74,24 @@ function showMissingTerrainSkill(feature: TerrainFeature) {
   const message = feature.missingSkillMessage ?? (feature.requiredSkill ? skills[feature.requiredSkill].missingSkillMessage : 'That terrain is blocked.');
   toast(message); blockedSkillMessageCooldown = 1.25; lastBlockedTerrainId = feature.id;
 }
-function isDone(id: string) { return id === 'talked' || id === 'delivered' || id === 'bridge' ? state[id] : allItems.find(item => item.id === id)?.done; }
+function isObjectiveComplete(id: string) { return state.quests.completedObjectiveIds.has(id); }
+function completeObjective(id: string) {
+  if (isObjectiveComplete(id)) return false;
+  state.quests.completedObjectiveIds.add(id);
+  for (const quest of quests) {
+    if (quest.objectives.every(objective => objective.isOptional || isObjectiveComplete(objective.id))) state.quests.completedQuestIds.add(quest.id);
+  }
+  return true;
+}
+function isObjectiveUnlocked(objective: ObjectiveDefinition) { return (objective.prerequisiteObjectiveIds ?? []).every(isObjectiveComplete); }
+function visibleObjectives() { return morningSupplyScrambleQuest.objectives.filter(objective => isObjectiveUnlocked(objective) || objective.visibleWhenLocked); }
 function completeBridgeObjective() {
   if (state.bridge || !isBridgeUnlocked()) return;
-  state.bridge = true; award(50); toast('Under Construction: Back 40 coming soon! +50 SP'); refreshUI();
+  state.bridge = true; completeObjective('bridge'); award(50); toast('Under Construction: Back 40 coming soon! +50 SP'); refreshUI();
 }
-function activeTask() { return tasks.find(({ id }) => !isDone(id)); }
+function activeTask() { return morningSupplyScrambleQuest.objectives.find(objective => !isObjectiveComplete(objective.id) && isObjectiveUnlocked(objective)); }
 function objective() { return activeTask()?.label ?? 'Report to the Rally Circle'; }
-function resolveObjectiveTarget(task: TaskDefinition) {
+function resolveObjectiveTarget(task: ObjectiveDefinition) {
   if (!task.targetType || !task.targetId) return;
   const targetMap = maps[task.targetMapId ?? mainCamp.id];
   if (!targetMap) return;
@@ -88,14 +99,14 @@ function resolveObjectiveTarget(task: TaskDefinition) {
     item: targetMap.items, npc: targetMap.npcs, interactable: targetMap.interactables, exit: targetMap.exits, zone: targetMap.zones, location: targetMap.buildings,
   };
   const target = collections[task.targetType].find(({ id }) => id === task.targetId);
-  if (!target || (task.targetType === 'item' && target.done)) return;
+  if (!target) return;
   return { target, mapId: targetMap.id, label: task.targetLabel ?? target.label };
 }
 function refreshUI() {
   ui.energy.style.width = `${player.energy}%`; ui.points.textContent = `${player.points} SP`;
   const best = Number(localStorage.getItem('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
   ui.objective.textContent = `${currentMap.displayName}: ${objective()}`;
-  ui.tasks.innerHTML = tasks.map(({ id, label }) => `<li class="${isDone(id) ? 'done' : ''}">${label}</li>`).join('');
+  ui.tasks.innerHTML = visibleObjectives().map(objective => `<li class="${isObjectiveComplete(objective.id) ? 'done' : isObjectiveUnlocked(objective) ? '' : 'locked'}">${objective.label}</li>`).join('');
   const large = visibleLabels('large'), tray = visibleLabels('tray'), small = visibleLabels('small');
   const hands = large.length === 1 && carrySize(state.largePickupOrder.at(-1) ?? '') === 2 ? `${large[0]} (both hands)` : `${large[0] ?? 'empty'} | ${large[1] ?? 'empty'}`;
   ui.carrySummary.textContent = [`Hands: ${hands}`, tray.length ? `Tray: ${tray.join(', ')}` : '', small.length ? `Small: ${small.join(', ')}` : ''].filter(Boolean).join(' · ');
@@ -154,18 +165,20 @@ function interact() {
       toast(message); return;
     }
     if (nearbyInteractable.kind === 'delivery-zone' && hasItem('crate') && !state.delivered) {
-      state.delivered = true; removeItem('crate'); award(100); toast('Crate delivered! +100 SP'); refreshUI(); return;
+      const deliveryObjective = morningSupplyScrambleQuest.objectives.find(({ id }) => id === 'delivered');
+      if (deliveryObjective && !isObjectiveUnlocked(deliveryObjective)) { toast('Hang onto that crate until the supply hunt is checked off.'); return; }
+      state.delivered = true; completeObjective('delivered'); removeItem('crate'); award(100); toast('Crate delivered! +100 SP'); refreshUI(); return;
     }
   }
   const npc = currentMap.npcs.filter(({ id }) => id !== 'cliff').sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (npc && dist(player, npc) < 80) {
-    if (npc.id === 'coop' && !state.talked) { state.talked = true; award(25); }
+    if (npc.id === 'coop' && !state.talked) { state.talked = true; completeObjective('talked'); award(25); }
     showDialogue(npc, dialogue[npc.dialogueId][state.talked ? 1 : 0]); refreshUI(); return;
   }
   const item = currentMap.items.filter(({ done }) => !done).sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (item && dist(player, item) < 70) {
     if (!canCarry(item.id)) { toast(carrySize(item.id) === 2 ? 'That takes both hands, champ. Set down a bulky supply first.' : 'Your hands are full! Set down a bulky supply first.'); return; }
-    item.done = true; addItem(item.id);
+    item.done = true; addItem(item.id); completeObjective(item.id);
     const firstPickup = !state.rewardedPickups.has(item.id); if (firstPickup) { state.rewardedPickups.add(item.id); award(50); }
     toast(`${item.label} recovered!${firstPickup ? ' +50 SP' : ''}`); refreshUI(); return;
   }

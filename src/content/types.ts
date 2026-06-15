@@ -10,13 +10,25 @@ export interface DialogueSpeaker { displayName?: string; label?: string; accent?
 export interface NPCDefinition extends Thing { displayName?: string; accent?: string; portraits?: PortraitSet; dialogueId: string; }
 export type Dialogue = Record<string, readonly string[]>;
 export type ObjectiveTargetType = 'item' | 'npc' | 'interactable' | 'exit' | 'zone' | 'location';
-export interface TaskDefinition {
+export type ObjectiveType = 'talkToNpc' | 'findItem' | 'deliverItem' | 'completeInteraction' | 'inspectObject' | 'enterArea';
+export interface ObjectiveDefinition {
   id: string;
+  questId: string;
   label: string;
+  type: ObjectiveType;
   targetType?: ObjectiveTargetType;
   targetId?: string;
   targetMapId?: string;
   targetLabel?: string;
+  requiredItemId?: string;
+  prerequisiteObjectiveIds?: string[];
+  visibleWhenLocked?: boolean;
+  isOptional?: boolean;
+}
+export interface QuestDefinition {
+  id: string;
+  title: string;
+  objectives: ObjectiveDefinition[];
 }
 export type SkillId = 'nature' | 'swimming' | 'climbing';
 export interface SkillDefinition { id: SkillId; label: string; missingSkillMessage: string; }
