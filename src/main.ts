@@ -35,6 +35,7 @@ const start = currentMap.spawns.find(({ id }) => id === 'start')!;
 const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, points: 0 };
 const camera = { x: 0, y: 0 };
 const minimumGameplayViewport = { w: 320, h: 240 };
+type SafeGameplayViewport = { x: number; y: number; w: number; h: number; bottomInset: number };
 function clampCameraAxis(mapSize: number, viewportSize: number, desired: number) {
   if (mapSize <= viewportSize) return (mapSize - viewportSize) / 2;
   return Math.max(0, Math.min(mapSize - viewportSize, desired));
@@ -42,7 +43,6 @@ function clampCameraAxis(mapSize: number, viewportSize: number, desired: number)
 function bottomGameplayOverlayInset() {
   const playArea = canvas.parentElement;
   if (!playArea) return 0;
-  const playAreaRect = playArea.getBoundingClientRect();
   const canvasRect = canvas.getBoundingClientRect();
   const canvasScaleY = canvas.height / Math.max(1, canvasRect.height);
   const overlaySelectors = ['.dialogue:not(.hidden)', '.image-inspection:not(.hidden)'];
@@ -50,19 +50,23 @@ function bottomGameplayOverlayInset() {
     const overlay = playArea.querySelector<HTMLElement>(selector);
     if (!overlay) return inset;
     const rect = overlay.getBoundingClientRect();
-    const overlapsPlayArea = rect.bottom > playAreaRect.top && rect.top < playAreaRect.bottom && rect.right > playAreaRect.left && rect.left < playAreaRect.right;
-    if (!overlapsPlayArea) return inset;
-    const coveredCssPixels = Math.max(0, playAreaRect.bottom - Math.max(playAreaRect.top, rect.top));
+    const overlapsCanvas = rect.bottom > canvasRect.top && rect.top < canvasRect.bottom && rect.right > canvasRect.left && rect.left < canvasRect.right;
+    if (!overlapsCanvas) return inset;
+    const coveredCssPixels = Math.max(0, canvasRect.bottom - Math.max(canvasRect.top, rect.top));
     return Math.max(inset, coveredCssPixels * canvasScaleY);
   }, 0);
 }
-function gameplayViewport() {
+function gameplayViewport(): SafeGameplayViewport {
   const rect = canvas.getBoundingClientRect();
-  const internalPixelsPerCssPixel = Math.max(canvas.width / Math.max(1, rect.width), canvas.height / Math.max(1, rect.height));
-  const bottomInset = bottomGameplayOverlayInset();
+  const internalPixelsPerCssPixelX = canvas.width / Math.max(1, rect.width);
+  const internalPixelsPerCssPixelY = canvas.height / Math.max(1, rect.height);
+  const bottomInset = Math.min(canvas.height - minimumGameplayViewport.h, Math.max(0, bottomGameplayOverlayInset()));
   return {
-    w: Math.max(minimumGameplayViewport.w, Math.min(canvas.width, rect.width * internalPixelsPerCssPixel)),
-    h: Math.max(minimumGameplayViewport.h, Math.min(canvas.height, rect.height * internalPixelsPerCssPixel) - bottomInset),
+    x: 0,
+    y: 0,
+    w: Math.max(minimumGameplayViewport.w, Math.min(canvas.width, rect.width * internalPixelsPerCssPixelX)),
+    h: Math.max(minimumGameplayViewport.h, Math.min(canvas.height, rect.height * internalPixelsPerCssPixelY) - bottomInset),
+    bottomInset,
   };
 }
 function updateCamera() {
@@ -293,9 +297,10 @@ function drawTerrainDecor() {
     // Only consider procedural trees near the camera. This keeps the denser expanded woods mobile-friendly.
     const margin = 90, spacing = 90;
     const minX = Math.max(45, Math.floor((camera.x - margin) / spacing) * spacing + 45);
-    const maxX = Math.min(currentMap.size.w, camera.x + canvas.width + margin);
+    const viewport = gameplayViewport();
+    const maxX = Math.min(currentMap.size.w, camera.x + viewport.w + margin);
     const minY = Math.max(55, Math.floor((camera.y - margin) / spacing) * spacing + 55);
-    const maxY = Math.min(currentMap.size.h, camera.y + canvas.height + margin);
+    const maxY = Math.min(currentMap.size.h, camera.y + viewport.h + margin);
     const protectedThings: Rect[] = [...currentMap.buildings, ...currentMap.walls, ...currentMap.npcs, ...currentMap.items, ...currentMap.interactables, ...currentMap.exits, ...currentMap.hazards];
     for (let x = minX; x < maxX; x += spacing) for (let y = minY; y < maxY; y += spacing) {
       const tree = { x: x - 25, y: y - 30, w: 50, h: 65 };
@@ -347,13 +352,13 @@ function drawObjectiveArrow() {
   const dx = targetCenter.x - playerCenter.x, dy = targetCenter.y - playerCenter.y;
   const distance = Math.hypot(dx, dy);
   const viewport = gameplayViewport();
-  const targetScreen = { x: targetCenter.x - camera.x, y: targetCenter.y - camera.y };
+  const targetScreen = { x: viewport.x + targetCenter.x - camera.x, y: viewport.y + targetCenter.y - camera.y };
   const closeDistance = 180;
   if (distance <= closeDistance) return;
 
   const inset = 42;
-  const arrowX = Math.max(inset, Math.min(viewport.w - inset, targetScreen.x));
-  const arrowY = Math.max(inset, Math.min(viewport.h - inset, targetScreen.y));
+  const arrowX = Math.max(viewport.x + inset, Math.min(viewport.x + viewport.w - inset, targetScreen.x));
+  const arrowY = Math.max(viewport.y + inset, Math.min(viewport.y + viewport.h - inset, targetScreen.y));
   const angle = Math.atan2(dy, dx);
   ctx.save(); ctx.translate(arrowX, arrowY); ctx.rotate(angle);
   ctx.fillStyle = '#19301d'; ctx.beginPath(); ctx.moveTo(19, 0); ctx.lineTo(-11, -14); ctx.lineTo(-5, 0); ctx.lineTo(-11, 14); ctx.closePath(); ctx.fill();
@@ -361,8 +366,8 @@ function drawObjectiveArrow() {
 
   ctx.font = '900 11px Nunito';
   const labelWidth = Math.min(150, ctx.measureText(resolved.label).width + 14);
-  const labelX = Math.max(labelWidth / 2 + 4, Math.min(viewport.w - labelWidth / 2 - 4, arrowX));
-  const labelY = Math.max(17, Math.min(viewport.h - 7, arrowY + 27));
+  const labelX = Math.max(viewport.x + labelWidth / 2 + 4, Math.min(viewport.x + viewport.w - labelWidth / 2 - 4, arrowX));
+  const labelY = Math.max(viewport.y + 17, Math.min(viewport.y + viewport.h - 7, arrowY + 27));
   ctx.fillStyle = '#19301de8'; ctx.fillRect(labelX - labelWidth / 2, labelY - 14, labelWidth, 18);
   text(resolved.label, labelX, labelY, 11, '#fff3ae');
 }
@@ -388,7 +393,11 @@ function drawTitleScreen() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (gamePhase !== 'playing') { drawTitleScreen(); return; }
-  ctx.save(); ctx.translate(-camera.x, -camera.y);
+  const viewport = gameplayViewport();
+  ctx.fillStyle = '#071b12'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(viewport.x, viewport.y, viewport.w, viewport.h); ctx.clip();
+  ctx.translate(viewport.x - camera.x, viewport.y - camera.y);
   drawGroundBackground();
   drawTerrainDecor();
   drawBelowActors();
