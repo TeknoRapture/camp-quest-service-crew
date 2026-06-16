@@ -34,13 +34,41 @@ let currentMap: MapDefinition = mainCamp;
 const start = currentMap.spawns.find(({ id }) => id === 'start')!;
 const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, points: 0 };
 const camera = { x: 0, y: 0 };
+const minimumGameplayViewport = { w: 320, h: 240 };
 function clampCameraAxis(mapSize: number, viewportSize: number, desired: number) {
   if (mapSize <= viewportSize) return (mapSize - viewportSize) / 2;
   return Math.max(0, Math.min(mapSize - viewportSize, desired));
 }
+function bottomGameplayOverlayInset() {
+  const playArea = canvas.parentElement;
+  if (!playArea) return 0;
+  const playAreaRect = playArea.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  const canvasScaleY = canvas.height / Math.max(1, canvasRect.height);
+  const overlaySelectors = ['.dialogue:not(.hidden)', '.image-inspection:not(.hidden)'];
+  return overlaySelectors.reduce((inset, selector) => {
+    const overlay = playArea.querySelector<HTMLElement>(selector);
+    if (!overlay) return inset;
+    const rect = overlay.getBoundingClientRect();
+    const overlapsPlayArea = rect.bottom > playAreaRect.top && rect.top < playAreaRect.bottom && rect.right > playAreaRect.left && rect.left < playAreaRect.right;
+    if (!overlapsPlayArea) return inset;
+    const coveredCssPixels = Math.max(0, playAreaRect.bottom - Math.max(playAreaRect.top, rect.top));
+    return Math.max(inset, coveredCssPixels * canvasScaleY);
+  }, 0);
+}
+function gameplayViewport() {
+  const rect = canvas.getBoundingClientRect();
+  const internalPixelsPerCssPixel = Math.max(canvas.width / Math.max(1, rect.width), canvas.height / Math.max(1, rect.height));
+  const bottomInset = bottomGameplayOverlayInset();
+  return {
+    w: Math.max(minimumGameplayViewport.w, Math.min(canvas.width, rect.width * internalPixelsPerCssPixel)),
+    h: Math.max(minimumGameplayViewport.h, Math.min(canvas.height, rect.height * internalPixelsPerCssPixel) - bottomInset),
+  };
+}
 function updateCamera() {
-  camera.x = clampCameraAxis(currentMap.size.w, canvas.width, player.x + player.w / 2 - canvas.width / 2);
-  camera.y = clampCameraAxis(currentMap.size.h, canvas.height, player.y + player.h / 2 - canvas.height / 2);
+  const viewport = gameplayViewport();
+  camera.x = clampCameraAxis(currentMap.size.w, viewport.w, player.x + player.w / 2 - viewport.w / 2);
+  camera.y = clampCameraAxis(currentMap.size.h, viewport.h, player.y + player.h / 2 - viewport.h / 2);
 }
 const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
@@ -318,13 +346,14 @@ function drawObjectiveArrow() {
   const targetCenter = { x: resolved.target.x + resolved.target.w / 2, y: resolved.target.y + resolved.target.h / 2 };
   const dx = targetCenter.x - playerCenter.x, dy = targetCenter.y - playerCenter.y;
   const distance = Math.hypot(dx, dy);
+  const viewport = gameplayViewport();
   const targetScreen = { x: targetCenter.x - camera.x, y: targetCenter.y - camera.y };
   const closeDistance = 180;
   if (distance <= closeDistance) return;
 
   const inset = 42;
-  const arrowX = Math.max(inset, Math.min(canvas.width - inset, targetScreen.x));
-  const arrowY = Math.max(inset, Math.min(canvas.height - inset, targetScreen.y));
+  const arrowX = Math.max(inset, Math.min(viewport.w - inset, targetScreen.x));
+  const arrowY = Math.max(inset, Math.min(viewport.h - inset, targetScreen.y));
   const angle = Math.atan2(dy, dx);
   ctx.save(); ctx.translate(arrowX, arrowY); ctx.rotate(angle);
   ctx.fillStyle = '#19301d'; ctx.beginPath(); ctx.moveTo(19, 0); ctx.lineTo(-11, -14); ctx.lineTo(-5, 0); ctx.lineTo(-11, 14); ctx.closePath(); ctx.fill();
@@ -332,8 +361,8 @@ function drawObjectiveArrow() {
 
   ctx.font = '900 11px Nunito';
   const labelWidth = Math.min(150, ctx.measureText(resolved.label).width + 14);
-  const labelX = Math.max(labelWidth / 2 + 4, Math.min(canvas.width - labelWidth / 2 - 4, arrowX));
-  const labelY = Math.max(17, Math.min(canvas.height - 7, arrowY + 27));
+  const labelX = Math.max(labelWidth / 2 + 4, Math.min(viewport.w - labelWidth / 2 - 4, arrowX));
+  const labelY = Math.max(17, Math.min(viewport.h - 7, arrowY + 27));
   ctx.fillStyle = '#19301de8'; ctx.fillRect(labelX - labelWidth / 2, labelY - 14, labelWidth, 18);
   text(resolved.label, labelX, labelY, 11, '#fff3ae');
 }
