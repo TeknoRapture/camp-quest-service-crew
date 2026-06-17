@@ -26,22 +26,22 @@
         </header>
         <section class="objective"><b>NOW:</b> <span id="objective">Talk to Coop</span></section>
         <div class="play-area">
-          <canvas id="game" width="960" height="640" aria-label="Camp Quest game map"></canvas>
+          <canvas id="game" width="960" height="640" aria-label="Camp Quest game map" draggable="false"></canvas>
           <aside id="checklist" class="checklist" aria-hidden="true">
             <button id="close-checklist" aria-label="Close checklist">×</button>
             <h2>Service Checklist</h2><p><strong>Morning Supply Scramble</strong><br />DAY 1 · MAIN CAMP</p><ul id="tasks"></ul>
           </aside>
           <div id="dialogue" class="dialogue hidden" role="dialog" aria-live="polite">
-            <div id="portrait-panel" class="portrait-panel"><img id="dialogue-portrait" alt="" /></div>
+            <div id="portrait-panel" class="portrait-panel"><img id="dialogue-portrait" alt="" draggable="false" /></div>
             <div class="dialogue-copy">
-              <b id="speaker"></b><p id="dialogue-text"></p><small>Tap ACTION to continue</small>
+              <b id="speaker"></b><p id="dialogue-text" class="dialogue-text"></p><small>Tap ACTION to continue</small>
             </div>
           </div>
           <div id="toast" class="toast hidden"></div>
           <div id="image-inspection" class="image-inspection hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
             <figure class="inspection-card">
               <button id="close-inspection" class="inspection-close" aria-label="Close image inspection">×</button>
-              <h2 id="inspection-title"></h2><img id="inspection-image" alt="" />
+              <h2 id="inspection-title"></h2><img id="inspection-image" alt="" draggable="false" />
               <div id="inspection-fallback" class="inspection-fallback hidden" role="img" aria-label="Image unavailable placeholder">Image unavailable</div>
               <figcaption id="inspection-caption"></figcaption>
             </figure>
