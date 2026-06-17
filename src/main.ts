@@ -35,10 +35,15 @@ const start = currentMap.spawns.find(({ id }) => id === 'start')!;
 const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, points: 0 };
 const camera = { x: 0, y: 0 };
 const minimumGameplayViewport = { w: 320, h: 240 };
-type SafeGameplayViewport = { x: number; y: number; w: number; h: number; bottomInset: number };
+const bottomSafeViewportComfortPadding = { min: 24, preferredRatio: 0.05, max: 48 };
+type SafeGameplayViewport = { x: number; y: number; w: number; h: number; bottomInset: number; bottomComfortPadding: number };
 type CanvasContentRect = { left: number; top: number; right: number; bottom: number; width: number; height: number };
 // TEMPORARY DEV/TESTING ONLY: set to false or remove when top-map water/gorge/climbing gates should use normal progression again.
 const DEV_UNLOCK_TERRAIN_SKILLS = true;
+function clampNumber(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
+function bottomComfortPadding(viewportHeight: number) {
+  return clampNumber(viewportHeight * bottomSafeViewportComfortPadding.preferredRatio, bottomSafeViewportComfortPadding.min, bottomSafeViewportComfortPadding.max);
+}
 function clampCameraAxis(mapSize: number, viewportSize: number, desired: number) {
   if (mapSize <= viewportSize) return (mapSize - viewportSize) / 2;
   return Math.max(0, Math.min(mapSize - viewportSize, desired));
@@ -80,20 +85,23 @@ function bottomGameplayOverlayInset() {
     return inset;
   }, 0);
   const bottomUiHeightGamePx = bottomUiHeightCssPx * cssToGameY;
-  return Math.min(canvas.height - minimumGameplayViewport.h, Math.max(0, bottomUiHeightGamePx));
+  return clampNumber(bottomUiHeightGamePx, 0, canvas.height - minimumGameplayViewport.h);
 }
-let safeViewport: SafeGameplayViewport = { x: 0, y: 0, w: canvas.width, h: canvas.height, bottomInset: 0 };
+let safeViewport: SafeGameplayViewport = { x: 0, y: 0, w: canvas.width, h: canvas.height, bottomInset: 0, bottomComfortPadding: 0 };
 function recalculateSafeViewport() {
   const contentRect = renderedCanvasContentRect();
   const cssToGameX = canvas.width / Math.max(1, contentRect.width);
   const cssToGameY = canvas.height / Math.max(1, contentRect.height);
   const bottomInset = bottomGameplayOverlayInset();
+  const measuredViewportHeight = Math.min(canvas.height, contentRect.height * cssToGameY) - bottomInset;
+  const bottomPadding = bottomComfortPadding(measuredViewportHeight);
   safeViewport = {
     x: 0,
     y: 0,
     w: Math.max(minimumGameplayViewport.w, Math.min(canvas.width, contentRect.width * cssToGameX)),
-    h: Math.max(minimumGameplayViewport.h, Math.min(canvas.height, contentRect.height * cssToGameY) - bottomInset),
+    h: Math.max(minimumGameplayViewport.h, measuredViewportHeight - bottomPadding),
     bottomInset,
+    bottomComfortPadding: bottomPadding,
   };
   return safeViewport;
 }
