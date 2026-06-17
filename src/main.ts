@@ -36,38 +36,78 @@ const player = { x: start.x, y: start.y, w: 24, h: 30, speed: 185, energy: 100, 
 const camera = { x: 0, y: 0 };
 const minimumGameplayViewport = { w: 320, h: 240 };
 type SafeGameplayViewport = { x: number; y: number; w: number; h: number; bottomInset: number };
+type CanvasContentRect = { left: number; top: number; right: number; bottom: number; width: number; height: number };
+// TEMPORARY DEV/TESTING ONLY: set to false or remove when top-map water/gorge/climbing gates should use normal progression again.
+const DEV_UNLOCK_TERRAIN_SKILLS = true;
 function clampCameraAxis(mapSize: number, viewportSize: number, desired: number) {
   if (mapSize <= viewportSize) return (mapSize - viewportSize) / 2;
   return Math.max(0, Math.min(mapSize - viewportSize, desired));
 }
-function bottomGameplayOverlayInset() {
-  const playArea = canvas.parentElement;
-  if (!playArea) return 0;
-  const canvasRect = canvas.getBoundingClientRect();
-  const canvasScaleY = canvas.height / Math.max(1, canvasRect.height);
-  const overlaySelectors = ['.dialogue:not(.hidden)', '.image-inspection:not(.hidden)'];
-  return overlaySelectors.reduce((inset, selector) => {
-    const overlay = playArea.querySelector<HTMLElement>(selector);
-    if (!overlay) return inset;
-    const rect = overlay.getBoundingClientRect();
-    const overlapsCanvas = rect.bottom > canvasRect.top && rect.top < canvasRect.bottom && rect.right > canvasRect.left && rect.left < canvasRect.right;
-    if (!overlapsCanvas) return inset;
-    const coveredCssPixels = Math.max(0, canvasRect.bottom - Math.max(canvasRect.top, rect.top));
-    return Math.max(inset, coveredCssPixels * canvasScaleY);
-  }, 0);
-}
-function gameplayViewport(): SafeGameplayViewport {
+function renderedCanvasContentRect(): CanvasContentRect {
   const rect = canvas.getBoundingClientRect();
-  const internalPixelsPerCssPixelX = canvas.width / Math.max(1, rect.width);
-  const internalPixelsPerCssPixelY = canvas.height / Math.max(1, rect.height);
-  const bottomInset = Math.min(canvas.height - minimumGameplayViewport.h, Math.max(0, bottomGameplayOverlayInset()));
-  return {
+  const scale = Math.min(rect.width / Math.max(1, canvas.width), rect.height / Math.max(1, canvas.height));
+  const width = canvas.width * scale, height = canvas.height * scale;
+  const left = rect.left + (rect.width - width) / 2, top = rect.top + (rect.height - height) / 2;
+  return { left, top, right: left + width, bottom: top + height, width, height };
+}
+function visibleElementRect(element: HTMLElement) {
+  const style = getComputedStyle(element);
+  if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return;
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+  return rect;
+}
+function bottomGameplayOverlayInset() {
+  const contentRect = renderedCanvasContentRect();
+  const cssToGameY = canvas.height / Math.max(1, contentRect.height);
+  const overlaySelectors = [
+    '#carry-summary', '.carry-summary', '.dialogue:not(.hidden)', '.image-inspection:not(.hidden)', '.checklist.open',
+    '#portrait-guidance:not(.dismissed)', '.right-control-gutter', '.left-control-gutter', 'footer', '.hud', '.objective',
+  ];
+  const seen = new Set<HTMLElement>();
+  const bottomUiHeightCssPx = overlaySelectors.reduce((inset, selector) => {
+    const elements = Array.from(document.querySelectorAll<HTMLElement>(selector));
+    for (const element of elements) {
+      if (seen.has(element) || element === canvas) continue;
+      seen.add(element);
+      const rect = visibleElementRect(element);
+      if (!rect) continue;
+      const overlapsCanvasContent = rect.bottom > contentRect.top && rect.top < contentRect.bottom && rect.right > contentRect.left && rect.left < contentRect.right;
+      if (!overlapsCanvasContent) continue;
+      const coveredCssPixels = Math.max(0, contentRect.bottom - Math.max(contentRect.top, rect.top));
+      inset = Math.max(inset, coveredCssPixels);
+    }
+    return inset;
+  }, 0);
+  const bottomUiHeightGamePx = bottomUiHeightCssPx * cssToGameY;
+  return Math.min(canvas.height - minimumGameplayViewport.h, Math.max(0, bottomUiHeightGamePx));
+}
+let safeViewport: SafeGameplayViewport = { x: 0, y: 0, w: canvas.width, h: canvas.height, bottomInset: 0 };
+function recalculateSafeViewport() {
+  const contentRect = renderedCanvasContentRect();
+  const cssToGameX = canvas.width / Math.max(1, contentRect.width);
+  const cssToGameY = canvas.height / Math.max(1, contentRect.height);
+  const bottomInset = bottomGameplayOverlayInset();
+  safeViewport = {
     x: 0,
     y: 0,
-    w: Math.max(minimumGameplayViewport.w, Math.min(canvas.width, rect.width * internalPixelsPerCssPixelX)),
-    h: Math.max(minimumGameplayViewport.h, Math.min(canvas.height, rect.height * internalPixelsPerCssPixelY) - bottomInset),
+    w: Math.max(minimumGameplayViewport.w, Math.min(canvas.width, contentRect.width * cssToGameX)),
+    h: Math.max(minimumGameplayViewport.h, Math.min(canvas.height, contentRect.height * cssToGameY) - bottomInset),
     bottomInset,
   };
+  return safeViewport;
+}
+function gameplayViewport(): SafeGameplayViewport { return safeViewport; }
+function recalculateLayoutAndCamera() { recalculateSafeViewport(); updateCamera(); }
+let layoutTimeout: number | undefined;
+function scheduleLayoutRecalculation() {
+  recalculateLayoutAndCamera();
+  requestAnimationFrame(() => {
+    recalculateLayoutAndCamera();
+    requestAnimationFrame(recalculateLayoutAndCamera);
+  });
+  if (layoutTimeout !== undefined) window.clearTimeout(layoutTimeout);
+  layoutTimeout = window.setTimeout(recalculateLayoutAndCamera, 180);
 }
 function updateCamera() {
   const viewport = gameplayViewport();
@@ -101,7 +141,7 @@ function buildingCollisionRect(building: LocationDefinition): Rect {
 function areAllNonBridgeTasksComplete() { return morningSupplyScrambleQuest.objectives.filter(({ id }) => id !== 'bridge').every(({ id }) => isObjectiveComplete(id)); }
 function isBridgeUnlocked() { return areAllNonBridgeTasksComplete(); }
 function obstacles() { return [...currentMap.buildings.map(buildingCollisionRect), ...currentMap.walls.filter(wall => wall !== blockedBridge || !isBridgeUnlocked())]; }
-function hasSkill(skillId: SkillId) { return state.skills[skillId]; }
+function hasSkill(skillId: SkillId) { return DEV_UNLOCK_TERRAIN_SKILLS && (skillId === 'swimming' || skillId === 'climbing') ? true : state.skills[skillId]; }
 function blockedTerrain() {
   return currentMap.terrain.find(feature => {
     if (!feature.blocksMovement || !intersects(player, feature) || (feature.requiredSkill && hasSkill(feature.requiredSkill))) return false;
@@ -158,17 +198,17 @@ function showDialogue(speaker: DialogueSpeaker, text: string) {
   ui.dialogue.style.setProperty('--dialogue-accent', speaker.accent ?? '#a43f28');
   ui.dialogue.classList.remove('portrait-missing'); ui.portraitPanel.classList.remove('hidden'); ui.portrait.alt = `Portrait of ${displayName}`;
   ui.portrait.onerror = () => { ui.dialogue.classList.add('portrait-missing'); ui.portraitPanel.classList.add('hidden'); ui.portrait.removeAttribute('src'); };
-  ui.portrait.src = speaker.portraits?.default ?? genericNpcPortrait; ui.dialogue.classList.remove('hidden');
+  ui.portrait.src = speaker.portraits?.default ?? genericNpcPortrait; ui.dialogue.classList.remove('hidden'); scheduleLayoutRecalculation();
 }
-function closeDialogue() { dialogueOpen = false; ui.dialogue.classList.add('hidden'); }
+function closeDialogue() { dialogueOpen = false; ui.dialogue.classList.add('hidden'); scheduleLayoutRecalculation(); }
 function inspectImage(title: string, assetId: AssetId, caption: string) {
   inspectionOpen = true; keys.clear(); ui.inspectionTitle.textContent = title; ui.inspectionCaption.textContent = caption;
   ui.inspectionImage.classList.remove('hidden'); ui.inspectionFallback.classList.add('hidden'); ui.inspectionImage.alt = title;
   ui.inspectionFallback.textContent = `${title} image unavailable`;
   ui.inspectionImage.onerror = () => { ui.inspectionImage.classList.add('hidden'); ui.inspectionFallback.classList.remove('hidden'); };
-  ui.inspectionImage.src = assets.url(assetId); ui.inspection.classList.remove('hidden');
+  ui.inspectionImage.src = assets.url(assetId); ui.inspection.classList.remove('hidden'); scheduleLayoutRecalculation();
 }
-function closeInspection() { inspectionOpen = false; ui.inspection.classList.add('hidden'); }
+function closeInspection() { inspectionOpen = false; ui.inspection.classList.add('hidden'); scheduleLayoutRecalculation(); }
 function toast(text: string) { ui.toast.textContent = text; ui.toast.classList.remove('hidden'); toastTimer = 2.8; }
 function dist(a: Rect, b: Rect) { return Math.hypot(a.x + a.w / 2 - b.x - b.w / 2, a.y + a.h / 2 - b.y - b.h / 2); }
 function intersects(a: Rect, b: Rect) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
@@ -178,7 +218,7 @@ function switchMap(exit: InteractableDefinition) {
   const spawn = nextMap?.spawns.find(({ id }) => id === exit.targetSpawnId);
   if (!nextMap || !spawn) { toast('That route is not ready yet.'); return; }
   currentMap = nextMap; player.x = spawn.x; player.y = spawn.y; keys.clear(); transitionCooldown = .45;
-  updateCamera(); toast(`Entered ${currentMap.displayName}`); refreshUI();
+  scheduleLayoutRecalculation(); toast(`Entered ${currentMap.displayName}`); refreshUI();
 }
 function tryAutomaticExit() {
   if (transitionCooldown > 0) return false;
@@ -419,14 +459,14 @@ function updateFullscreenButtonState() {
   const isFullscreen = Boolean(document.fullscreenElement);
   ui.fullscreenButton.textContent = isFullscreen ? 'Exit Fullscreen' : '⛶ Fullscreen';
   ui.fullscreenButton.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
-  updateCamera();
+  scheduleLayoutRecalculation();
 }
 function startGame() {
   if (gamePhase !== 'ready') return;
   requestGameFullscreen();
   gamePhase = 'playing'; keys.clear(); actionQueued = false;
   document.querySelector('#game-shell')!.classList.remove('title-phase');
-  showDialogue(mainCamp.npcs[0], dialogue.opening[0]); refreshUI();
+  showDialogue(mainCamp.npcs[0], dialogue.opening[0]); refreshUI(); scheduleLayoutRecalculation();
 }
 
 let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (gamePhase === 'playing' && toastTimer > 0 && (toastTimer -= dt) <= 0) ui.toast.classList.add('hidden'); draw(); requestAnimationFrame(loop); }
@@ -467,13 +507,14 @@ const setChecklistOpen = (open: boolean) => {
   ui.checklist.classList.toggle('open', open);
   ui.checklist.setAttribute('aria-hidden', String(!open));
   checklistButton.setAttribute('aria-expanded', String(open));
+  scheduleLayoutRecalculation();
 };
 checklistButton.addEventListener('click', () => { if (gamePhase === 'playing') setChecklistOpen(!ui.checklist.classList.contains('open')); });
 document.querySelector('#close-checklist')!.addEventListener('click', () => setChecklistOpen(false));
-const clearHeldDirections = () => { keys.clear(); directionButtons.forEach(button => button.classList.remove('pressed')); updateCamera(); };
+const clearHeldDirections = () => { keys.clear(); directionButtons.forEach(button => button.classList.remove('pressed')); scheduleLayoutRecalculation(); };
 addEventListener('resize', clearHeldDirections);
 addEventListener('orientationchange', clearHeldDirections);
-document.querySelector('#dismiss-portrait-guidance')!.addEventListener('click', () => document.querySelector('#portrait-guidance')!.classList.add('dismissed'));
+document.querySelector('#dismiss-portrait-guidance')!.addEventListener('click', () => { document.querySelector('#portrait-guidance')!.classList.add('dismissed'); scheduleLayoutRecalculation(); });
 document.querySelector('#game-shell')!.classList.add('title-phase');
-updateCamera(); refreshUI(); requestAnimationFrame(loop);
+recalculateLayoutAndCamera(); refreshUI(); requestAnimationFrame(loop);
 assets.loadAll(npcPortraitPaths, progress => { loadingProgress = progress; }).then(() => { gamePhase = 'ready'; });
