@@ -50,4 +50,29 @@ export const bewareOfCliffQuest: QuestDefinition = {
   ],
 };
 
-export const quests: QuestDefinition[] = [morningSupplyScrambleQuest, bewareOfCliffQuest];
+export const discoverCliffMysteryQuest: QuestDefinition = {
+  id: 'discoverCliffMystery',
+  title: 'Discover the mystery of Cliff.',
+  summary: 'A completed-only secret for inspecting the strange Cliff warning sign.',
+  category: 'hidden',
+  questlineId: 'cliffTeaser',
+  sequence: 2,
+  requiredForProgression: false,
+  hiddenUntilDiscovered: true,
+  discoveryTrigger: { type: 'event', event: { type: 'interactableInspected', interactableId: 'cliffSign', mapId: 'mainCamp' } },
+  objectives: [
+    {
+      id: 'inspectCliffSign',
+      label: 'Inspect the Beware of Cliff sign.',
+      type: 'inspectInteractable',
+      interactableId: 'cliffSign',
+      mapId: 'mainCamp',
+      target: { type: 'interactable', id: 'cliffSign', mapId: 'mainCamp', label: 'Beware of Cliff sign' },
+    },
+  ],
+  rewards: [
+    { type: 'showToast', text: 'Secret found: Discover the mystery of Cliff.' },
+  ],
+};
+
+export const quests: QuestDefinition[] = [morningSupplyScrambleQuest, bewareOfCliffQuest, discoverCliffMysteryQuest];

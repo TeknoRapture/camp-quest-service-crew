@@ -29,6 +29,8 @@ const ui = {
   inspectionFallback: document.querySelector('#inspection-fallback')!,
   carrySummary: document.querySelector('#carry-summary')!, dropButton: document.querySelector<HTMLButtonElement>('#drop-button')!,
   fullscreenButton: document.querySelector<HTMLButtonElement>('#fullscreen-button')!,
+  checklistScrollUp: document.querySelector<HTMLButtonElement>('#checklist-scroll-up')!,
+  checklistScrollDown: document.querySelector<HTMLButtonElement>('#checklist-scroll-down')!,
 };
 
 let currentMap: MapDefinition = mainCamp;
@@ -210,6 +212,12 @@ function resolveObjectiveTarget(task: ObjectiveDefinition) {
   if (!target) return;
   return { target, mapId: targetMap.id, label: objectiveTarget.label ?? target.label };
 }
+function updateChecklistScrollButtons() {
+  const canScroll = ui.tasks.scrollHeight > ui.tasks.clientHeight + 1;
+  ui.checklistScrollUp.disabled = !canScroll || ui.tasks.scrollTop <= 0;
+  ui.checklistScrollDown.disabled = !canScroll || ui.tasks.scrollTop + ui.tasks.clientHeight >= ui.tasks.scrollHeight - 1;
+}
+
 function refreshUI() {
   ui.energy.style.width = `${player.energy}%`; ui.points.textContent = `${player.points} SP`;
   const best = Number(localStorage.getItem('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
@@ -218,6 +226,7 @@ function refreshUI() {
     if (!objective) return `<li class="quest-heading">${questLabel(quest)}</li>`;
     return `<li class="${isObjectiveComplete(quest.id, objective.id) ? 'done' : isObjectiveUnlocked(quest.id, objective) ? '' : 'locked'}">${objective.label}</li>`;
   }).join('');
+  updateChecklistScrollButtons();
   const large = visibleLabels('large'), tray = visibleLabels('tray'), small = visibleLabels('small');
   const hands = large.length === 1 && carrySize(state.largePickupOrder.at(-1) ?? '') === 2 ? `${large[0]} (both hands)` : `${large[0] ?? 'empty'} | ${large[1] ?? 'empty'}`;
   ui.carrySummary.textContent = [`Hands: ${hands}`, tray.length ? `Tray: ${tray.join(', ')}` : '', small.length ? `Small: ${small.join(', ')}` : ''].filter(Boolean).join(' · ');
@@ -547,7 +556,14 @@ const setChecklistOpen = (open: boolean) => {
   ui.checklist.setAttribute('aria-hidden', String(!open));
   checklistButton.setAttribute('aria-expanded', String(open));
   scheduleLayoutRecalculation();
+  requestAnimationFrame(updateChecklistScrollButtons);
 };
+const scrollChecklist = (direction: 1 | -1) => ui.tasks.scrollBy({ top: direction * 120, behavior: 'smooth' });
+ui.tasks.addEventListener('scroll', updateChecklistScrollButtons, { passive: true });
+ui.checklistScrollUp.addEventListener('pointerdown', event => { event.preventDefault(); scrollChecklist(-1); });
+ui.checklistScrollDown.addEventListener('pointerdown', event => { event.preventDefault(); scrollChecklist(1); });
+ui.checklistScrollUp.addEventListener('contextmenu', preventControlDefault);
+ui.checklistScrollDown.addEventListener('contextmenu', preventControlDefault);
 checklistButton.addEventListener('click', () => { if (gamePhase === 'playing') setChecklistOpen(!ui.checklist.classList.contains('open')); });
 document.querySelector('#close-checklist')!.addEventListener('click', () => setChecklistOpen(false));
 const clearHeldDirections = () => { keys.clear(); directionButtons.forEach(button => button.classList.remove('pressed')); scheduleLayoutRecalculation(); };
