@@ -44,7 +44,8 @@ No backend, accounts, database, or AWS services are required. The best Service P
 
 ## Project structure
 
-- `src/main.ts` — game state, input, update loop, interactions, and canvas rendering.
+- `src/main.ts` — game state, input, update loop, interactions, quest-event integration, and canvas rendering.
+- `src/questEngine.ts` — generic typed quest state helpers, visibility selectors, event/objective resolution, tracked objective selection, and typed reward application.
 - `src/assets.ts` — reusable loader and public asset catalog; failed or pending images leave the canvas fallbacks in place.
 - `src/sprites.ts` — reusable canvas sprite drawing helper.
 - `public/assets/` — game-ready, text-based SVG sprites for supplies, terrain, hazards, and creatures; supplied inspection images remain in `public/reference/`.
@@ -58,7 +59,7 @@ Static game content lives in `src/content/` so future changes can add or edit co
 
 - `npcs.ts` controls NPC definitions, display names, positions, accents, and portrait assignments.
 - `dialogue.ts` controls NPC conversations and story messages.
-- `tasks.ts` controls Service Checklist objectives.
+- `quests.ts` controls typed quest definitions for the Service Checklist; `tasks.ts` remains a compatibility re-export.
 - `items.ts` controls collectible tools and supplies.
 - `interactables.ts` controls signs, inspection objects, and interaction zones.
 - `hazards.ts` controls terrain and wildlife hazards, including future Nature Skills interactions and damage mitigation.
@@ -67,10 +68,10 @@ Static game content lives in `src/content/` so future changes can add or edit co
 - `maps/mainCamp.ts` composes the intentionally arranged outdoor map, terrain, zones, placements, collision, and Shower House entrance.
 - `maps/showerHouse.ts` defines the first small interior, including its walls, wet-floor hazard, cleaning spot, and exit.
 - `maps/index.ts` registers maps available to the lightweight map switcher.
-- `types.ts` contains the shared TypeScript interfaces for content, maps, skills, terrain gates, and hazard mitigation data.
+- `types.ts` contains the shared TypeScript interfaces for content, maps, skills, terrain gates, hazard mitigation data, quest categories, objective unions, quest events, quest state, and typed rewards.
 
 Future Codex tasks should add game content through these files when possible instead of hardcoding it into the gameplay loop. To add another interior, define a readable `MapDefinition`, register it in `maps/index.ts`, and pair indoor/outdoor `map-exit` interactables with matching spawn IDs. Normal open Shower House doorways use automatic overlap transitions. Main Camp sets a modest `buildingFrontOverlap` that shortens outdoor building collision from the bottom while leaving each full building visual unchanged; a building can override it with `frontOverlap`. Doorway visuals are independent and can define their own `depth`, so future locked, special, or story-gated exits can omit automatic activation and continue to use the Action button. The canvas renderer uses a small named pass order—ground/background, terrain/decor, below actors, actors, then above actors—so outdoor building bodies and doors stay below the player while roofs and overhangs can cover actors for the top-down overlap illusion.
 
 ## Expanding the game
 
-The foundation intentionally uses straightforward data arrays for maps, terrain, buildings, NPCs, supplies, hazards, and checklist tasks. To convert another object to a sprite, add its path to `assetPaths` and assign its `assetId` in the relevant item or hazard content entry; the shared renderer keeps the existing shape fallback available. NPC dialogue metadata can define a display name, accent color, and an emotion-ready portrait set; NPCs without a custom portrait use the generic fallback. The reusable inspection overlay can similarly display maps, notes, schedules, labels, and other image clues. Future days can add more objects and interactions without introducing a large generic game engine. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.
+The foundation intentionally uses straightforward data arrays for maps, terrain, buildings, NPCs, supplies, hazards, and typed quest definitions. To convert another object to a sprite, add its path to `assetPaths` and assign its `assetId` in the relevant item or hazard content entry; the shared renderer keeps the existing shape fallback available. NPC dialogue metadata can define a display name, accent color, and an emotion-ready portrait set; NPCs without a custom portrait use the generic fallback. The reusable inspection overlay can similarly display maps, notes, schedules, labels, and other image clues. Future days can add more objects, questlines, side quests, hidden quests, and interactions without introducing a large generic game engine; gameplay hooks should emit generic quest events rather than hardcoding quest-specific branches. The Back 40, Nature Skills, cleaning/restocking tasks, and the Cliff mystery are teased but left for later expansion.

@@ -9,26 +9,82 @@ export interface PortraitSet { default?: string; happy?: string; serious?: strin
 export interface DialogueSpeaker { displayName?: string; label?: string; accent?: string; portraits?: PortraitSet; }
 export interface NPCDefinition extends Thing { displayName?: string; accent?: string; portraits?: PortraitSet; dialogueId: string; }
 export type Dialogue = Record<string, readonly string[]>;
+export type QuestId = string;
+export type ObjectiveId = string;
+export type QuestCategory = 'main' | 'side' | 'hidden' | 'tutorial';
+export type QuestStatus = 'locked' | 'available' | 'active' | 'completed';
 export type ObjectiveTargetType = 'item' | 'npc' | 'interactable' | 'exit' | 'zone' | 'location';
-export type ObjectiveType = 'talkToNpc' | 'findItem' | 'deliverItem' | 'completeInteraction' | 'inspectObject' | 'enterArea';
-export interface ObjectiveDefinition {
-  id: string;
-  questId: string;
+export type ObjectiveType = 'talkToNpc' | 'findItem' | 'possessItem' | 'deliverItem' | 'completeInteraction' | 'inspectInteractable' | 'enterArea' | 'reachLocation' | 'cleanTarget' | 'questFlag';
+export interface ObjectiveTarget { type: ObjectiveTargetType; id: string; mapId?: string; label?: string; }
+interface ObjectiveBase {
+  id: ObjectiveId;
   label: string;
-  type: ObjectiveType;
-  targetType?: ObjectiveTargetType;
-  targetId?: string;
-  targetMapId?: string;
-  targetLabel?: string;
-  requiredItemId?: string;
-  prerequisiteObjectiveIds?: string[];
+  required?: boolean;
+  prerequisiteObjectiveIds?: ObjectiveId[];
   visibleWhenLocked?: boolean;
   isOptional?: boolean;
+  target?: ObjectiveTarget;
+  arrowTarget?: ObjectiveTarget;
+  rewards?: QuestReward[];
 }
+export interface TalkToNpcObjective extends ObjectiveBase { type: 'talkToNpc'; npcId: string; mapId?: string; }
+export interface FindItemObjective extends ObjectiveBase { type: 'findItem'; itemId: string; mapId?: string; }
+export interface PossessItemObjective extends ObjectiveBase { type: 'possessItem'; itemId: string; mapId?: string; }
+export interface DeliverItemObjective extends ObjectiveBase { type: 'deliverItem'; itemId: string; interactableId: string; mapId?: string; }
+export interface CompleteInteractionObjective extends ObjectiveBase { type: 'completeInteraction'; interactableId: string; mapId?: string; }
+export interface InspectInteractableObjective extends ObjectiveBase { type: 'inspectInteractable'; interactableId: string; mapId?: string; }
+export interface EnterAreaObjective extends ObjectiveBase { type: 'enterArea'; mapId: string; }
+export interface ReachLocationObjective extends ObjectiveBase { type: 'reachLocation'; locationId: string; mapId?: string; }
+export interface CleanTargetObjective extends ObjectiveBase { type: 'cleanTarget'; targetId: string; mapId?: string; }
+export interface QuestFlagObjective extends ObjectiveBase { type: 'questFlag'; flag: string; }
+export type ObjectiveDefinition = TalkToNpcObjective | FindItemObjective | PossessItemObjective | DeliverItemObjective | CompleteInteractionObjective | InspectInteractableObjective | EnterAreaObjective | ReachLocationObjective | CleanTargetObjective | QuestFlagObjective;
 export interface QuestDefinition {
-  id: string;
+  id: QuestId;
   title: string;
+  summary?: string;
+  category: QuestCategory;
+  questlineId?: string;
+  parentQuestId?: QuestId;
+  sequence?: number;
+  requiredForProgression?: boolean;
+  hiddenUntilDiscovered?: boolean;
+  startsActive?: boolean;
+  previewWhenLocked?: boolean;
+  prerequisites?: QuestPrerequisite[];
+  discoveryTrigger?: QuestTrigger;
+  startTrigger?: QuestTrigger;
   objectives: ObjectiveDefinition[];
+  rewards?: QuestReward[];
+}
+export type QuestPrerequisite = { type: 'questCompleted'; questId: QuestId } | { type: 'objectiveCompleted'; questId: QuestId; objectiveId: ObjectiveId } | { type: 'flag'; flag: string; value?: boolean | string | number };
+export type QuestTrigger = { type: 'event'; event: QuestEvent };
+export type QuestReward =
+  | { type: 'addScore'; amount: number }
+  | { type: 'showToast'; text: string }
+  | { type: 'setFlag'; flag: string; value?: boolean | string | number }
+  | { type: 'activateQuest'; questId: QuestId }
+  | { type: 'discoverQuest'; questId: QuestId }
+  | { type: 'unlockGate'; gateId: string }
+  | { type: 'unlockSkill'; skillId: SkillId };
+export type QuestEvent =
+  | { type: 'itemPickedUp'; itemId: string; mapId: string }
+  | { type: 'itemDelivered'; itemId: string; interactableId: string; mapId: string }
+  | { type: 'npcTalked'; npcId: string; mapId: string }
+  | { type: 'mapEntered'; mapId: string; spawnId?: string }
+  | { type: 'interactableInspected'; interactableId: string; mapId: string }
+  | { type: 'interactionCompleted'; interactableId: string; mapId: string }
+  | { type: 'locationReached'; locationId: string; mapId: string }
+  | { type: 'cleanTargetCompleted'; targetId: string; mapId: string }
+  | { type: 'questFlagSet'; flag: string };
+export interface QuestEventResult { completedObjectives: { questId: QuestId; objectiveId: ObjectiveId }[]; completedQuests: QuestId[]; activatedQuests: QuestId[]; discoveredQuests: QuestId[]; rewards: QuestReward[]; messages: string[]; }
+export interface QuestRuntimeState {
+  questStatuses: Record<QuestId, QuestStatus>;
+  completedObjectiveIdsByQuest: Record<QuestId, Set<ObjectiveId>>;
+  discoveredQuestIds: Set<QuestId>;
+  activeQuestIds: Set<QuestId>;
+  completedQuestIds: Set<QuestId>;
+  trackedQuestId?: QuestId;
+  flags: Record<string, boolean | string | number>;
 }
 export type SkillId = 'nature' | 'swimming' | 'climbing';
 export interface SkillDefinition { id: SkillId; label: string; missingSkillMessage: string; }
