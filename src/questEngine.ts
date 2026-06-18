@@ -70,6 +70,7 @@ export function isQuestCompleted(questState: QuestRuntimeState, quest: QuestDefi
 }
 
 export function isQuestVisible(questState: QuestRuntimeState, quest: QuestDefinition) {
+  if (quest.category === 'hidden') return isQuestCompleted(questState, quest);
   if (quest.hiddenUntilDiscovered && !questState.discoveredQuestIds.has(quest.id)) return false;
   const status = questState.questStatuses[quest.id] ?? 'locked';
   return status === 'active' || status === 'completed' || status === 'available' || Boolean(quest.previewWhenLocked);
@@ -161,7 +162,7 @@ export function handleQuestEvent(questState: QuestRuntimeState, quests: QuestDef
   }
 
   for (const quest of quests) {
-    if (!isQuestActive(questState, quest) || !isQuestVisible(questState, quest)) continue;
+    if (!isQuestActive(questState, quest)) continue;
     for (const objective of quest.objectives) {
       if (isObjectiveComplete(questState, quest.id, objective.id) || !isObjectiveUnlocked(questState, quest, objective)) continue;
       if (!eventMatchesObjective(event, objective)) continue;
