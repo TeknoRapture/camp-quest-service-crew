@@ -277,6 +277,7 @@ function interact() {
   if (nearbyInteractable && dist(player, nearbyInteractable) < 105) {
     if (nearbyInteractable.kind === 'inspection' && nearbyInteractable.title && nearbyInteractable.assetId) {
       processQuestEvent({ type: 'interactableInspected', interactableId: nearbyInteractable.id, mapId: currentMap.id });
+      refreshUI();
       inspectImage(nearbyInteractable.title, nearbyInteractable.assetId, nearbyInteractable.caption ?? nearbyInteractable.label); return;
     }
     if (nearbyInteractable.id === 'back40TeaserMessage') { completeBridgeObjective(); return; }
