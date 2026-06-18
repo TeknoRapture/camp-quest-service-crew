@@ -26,7 +26,10 @@ interface ObjectiveBase {
   target?: ObjectiveTarget;
   arrowTarget?: ObjectiveTarget;
   rewards?: QuestReward[];
+  /** Optional line to show when this objective completes through a matching talk/interact event. */
+  completionDialogue?: string;
 }
+
 export interface TalkToNpcObjective extends ObjectiveBase { type: 'talkToNpc'; npcId: string; mapId?: string; }
 export interface FindItemObjective extends ObjectiveBase { type: 'findItem'; itemId: string; mapId?: string; }
 export interface PossessItemObjective extends ObjectiveBase { type: 'possessItem'; itemId: string; mapId?: string; }
@@ -52,6 +55,8 @@ export interface QuestDefinition {
   previewWhenLocked?: boolean;
   prerequisites?: QuestPrerequisite[];
   discoveryTrigger?: QuestTrigger;
+  /** Toast shown by the generic quest event flow when this quest is first discovered. */
+  discoveryMessage?: string;
   startTrigger?: QuestTrigger;
   objectives: ObjectiveDefinition[];
   rewards?: QuestReward[];

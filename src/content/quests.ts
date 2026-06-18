@@ -20,4 +20,34 @@ export const morningSupplyScrambleQuest: QuestDefinition = {
   ],
 };
 
-export const quests: QuestDefinition[] = [morningSupplyScrambleQuest];
+
+export const bewareOfCliffQuest: QuestDefinition = {
+  id: 'bewareOfCliff',
+  title: 'Beware of Cliff!',
+  summary: 'A tiny optional mystery note from the sign by Cliff Trail.',
+  category: 'hidden',
+  questlineId: 'cliffTeaser',
+  sequence: 1,
+  requiredForProgression: false,
+  hiddenUntilDiscovered: true,
+  discoveryTrigger: { type: 'event', event: { type: 'interactableInspected', interactableId: 'cliffSign', mapId: 'mainCamp' } },
+  discoveryMessage: 'Hidden quest discovered: Beware of Cliff!',
+  objectives: [
+    {
+      id: 'askCoopAboutCliff',
+      label: 'Ask Coop about the weird sign.',
+      type: 'talkToNpc',
+      npcId: 'coop',
+      mapId: 'mainCamp',
+      target: { type: 'npc', id: 'coop', mapId: 'mainCamp', label: 'Coop' },
+      completionDialogue: 'Ah, you found the Cliff sign. We don’t talk about Cliff before breakfast. Or after breakfast, really.',
+    },
+  ],
+  rewards: [
+    { type: 'setFlag', flag: 'cliffSignReported', value: true },
+    { type: 'addScore', amount: 10 },
+    { type: 'showToast', text: 'Mystery noted: Coop has heard of Cliff.' },
+  ],
+};
+
+export const quests: QuestDefinition[] = [morningSupplyScrambleQuest, bewareOfCliffQuest];

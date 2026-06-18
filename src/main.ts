@@ -167,7 +167,15 @@ function isObjectiveUnlocked(questId: string, objective: ObjectiveDefinition) {
   const quest = quests.find(candidate => candidate.id === questId);
   return quest ? isQuestObjectiveUnlocked(state.quests, quest, objective) : false;
 }
-function visibleQuestEntries() { return getVisibleQuests(quests, state.quests).flatMap(quest => getVisibleObjectivesForQuest(state.quests, quest).map(objective => ({ quest, objective }))); }
+function questLabel(quest: (typeof quests)[number]) {
+  return quest.category === 'hidden' ? `[Hidden] ${quest.title}` : quest.category === 'side' ? `[Optional] ${quest.title}` : quest.title;
+}
+function visibleQuestEntries() {
+  return getVisibleQuests(quests, state.quests).flatMap(quest => [
+    { quest, objective: undefined },
+    ...getVisibleObjectivesForQuest(state.quests, quest).map(objective => ({ quest, objective })),
+  ]);
+}
 function activeTask() { return getTrackedObjective(quests, state.quests); }
 function objective() { return activeTask()?.objective.label ?? 'Report to the Rally Circle'; }
 function processQuestEvent(event: QuestEvent) {
@@ -175,6 +183,15 @@ function processQuestEvent(event: QuestEvent) {
   applyQuestRewards(state.quests, result, { addScore: award, showToast: toast, unlockSkill: skillId => { if (skillId in state.skills) state.skills[skillId as SkillId] = true; } });
   return result;
 }
+
+function completedObjectiveDialogue(result: ReturnType<typeof processQuestEvent>) {
+  for (const completed of result.completedObjectives) {
+    const quest = quests.find(candidate => candidate.id === completed.questId);
+    const objective = quest?.objectives.find(candidate => candidate.id === completed.objectiveId);
+    if (objective?.completionDialogue) return objective.completionDialogue;
+  }
+}
+
 function completeBridgeObjective() {
   if (state.bridge || !isBridgeUnlocked()) return false;
   const result = processQuestEvent({ type: 'interactionCompleted', interactableId: 'back40TeaserMessage', mapId: currentMap.id });
@@ -197,7 +214,10 @@ function refreshUI() {
   ui.energy.style.width = `${player.energy}%`; ui.points.textContent = `${player.points} SP`;
   const best = Number(localStorage.getItem('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
   ui.objective.textContent = `${currentMap.displayName}: ${objective()}`;
-  ui.tasks.innerHTML = visibleQuestEntries().map(({ quest, objective }) => `<li class="${isObjectiveComplete(quest.id, objective.id) ? 'done' : isObjectiveUnlocked(quest.id, objective) ? '' : 'locked'}">${objective.label}</li>`).join('');
+  ui.tasks.innerHTML = visibleQuestEntries().map(({ quest, objective }) => {
+    if (!objective) return `<li class="quest-heading">${questLabel(quest)}</li>`;
+    return `<li class="${isObjectiveComplete(quest.id, objective.id) ? 'done' : isObjectiveUnlocked(quest.id, objective) ? '' : 'locked'}">${objective.label}</li>`;
+  }).join('');
   const large = visibleLabels('large'), tray = visibleLabels('tray'), small = visibleLabels('small');
   const hands = large.length === 1 && carrySize(state.largePickupOrder.at(-1) ?? '') === 2 ? `${large[0]} (both hands)` : `${large[0] ?? 'empty'} | ${large[1] ?? 'empty'}`;
   ui.carrySummary.textContent = [`Hands: ${hands}`, tray.length ? `Tray: ${tray.join(', ')}` : '', small.length ? `Small: ${small.join(', ')}` : ''].filter(Boolean).join(' · ');
@@ -271,7 +291,7 @@ function interact() {
   if (npc && dist(player, npc) < 80) {
     const result = processQuestEvent({ type: 'npcTalked', npcId: npc.id, mapId: currentMap.id });
     if (result.completedObjectives.some(({ objectiveId }) => objectiveId === 'talked')) state.talked = true;
-    showDialogue(npc, dialogue[npc.dialogueId][state.talked ? 1 : 0]); refreshUI(); return;
+    showDialogue(npc, completedObjectiveDialogue(result) ?? dialogue[npc.dialogueId][state.talked ? 1 : 0]); refreshUI(); return;
   }
   const item = currentMap.items.filter(({ done }) => !done).sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (item && dist(player, item) < 70) {

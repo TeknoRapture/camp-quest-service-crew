@@ -153,7 +153,10 @@ export function handleQuestEvent(questState: QuestRuntimeState, quests: QuestDef
   const result: QuestEventResult = { completedObjectives: [], completedQuests: [], activatedQuests: [], discoveredQuests: [], rewards: [], messages: [] };
 
   for (const quest of quests) {
-    if (triggerMatches(event, quest, 'discoveryTrigger') && prerequisitesMet(questState, quest) && discoverQuest(questState, quest)) result.discoveredQuests.push(quest.id);
+    if (triggerMatches(event, quest, 'discoveryTrigger') && prerequisitesMet(questState, quest) && discoverQuest(questState, quest)) {
+      result.discoveredQuests.push(quest.id);
+      if (quest.discoveryMessage) result.messages.push(quest.discoveryMessage);
+    }
     if ((triggerMatches(event, quest, 'startTrigger') || questState.questStatuses[quest.id] === 'available') && prerequisitesMet(questState, quest) && activateQuest(questState, quest)) result.activatedQuests.push(quest.id);
   }
 
