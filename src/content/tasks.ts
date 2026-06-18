@@ -1,1 +1,1 @@
-export { morningSupplyScrambleQuest, quests } from './quests';
+export { morningSupplyScrambleQuest, inspectCliffSignQuest, quests } from './quests';
