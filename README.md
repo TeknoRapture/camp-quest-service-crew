@@ -27,6 +27,8 @@ Open the local URL printed by Vite.
 
 ```bash
 npm run build
+npm run validate:quests
+npm run test:quest-engine
 npm run preview
 ```
 
@@ -45,7 +47,7 @@ No backend, accounts, database, or AWS services are required. The best Service P
 ## Project structure
 
 - `src/main.ts` — game state, input, update loop, interactions, quest-event integration, and canvas rendering.
-- `src/questEngine.ts` — generic typed quest state helpers, visibility selectors, event/objective resolution, tracked objective selection, and typed reward application.
+- `src/questEngine.ts` — generic typed quest validation, lifecycle/progression helpers, visibility selectors, event/objective resolution, tracked objective selection, and typed reward application.
 - `src/assets.ts` — reusable loader and public asset catalog; failed or pending images leave the canvas fallbacks in place.
 - `src/sprites.ts` — reusable canvas sprite drawing helper.
 - `public/assets/` — game-ready, text-based SVG sprites for supplies, terrain, hazards, and creatures; supplied inspection images remain in `public/reference/`.
@@ -70,7 +72,7 @@ Static game content lives in `src/content/` so future changes can add or edit co
 - `maps/index.ts` registers maps available to the lightweight map switcher.
 - `types.ts` contains the shared TypeScript interfaces for content, maps, skills, terrain gates, hazard mitigation data, quest categories, objective unions, quest events, quest state, and typed rewards.
 
-Future Codex tasks should add game content through these files when possible instead of hardcoding it into the gameplay loop. To add another interior, define a readable `MapDefinition`, register it in `maps/index.ts`, and pair indoor/outdoor `map-exit` interactables with matching spawn IDs. Normal open Shower House doorways use automatic overlap transitions. Main Camp sets a modest `buildingFrontOverlap` that shortens outdoor building collision from the bottom while leaving each full building visual unchanged; a building can override it with `frontOverlap`. Doorway visuals are independent and can define their own `depth`, so future locked, special, or story-gated exits can omit automatic activation and continue to use the Action button. The canvas renderer uses a small named pass order—ground/background, terrain/decor, below actors, actors, then above actors—so outdoor building bodies and doors stay below the player while roofs and overhangs can cover actors for the top-down overlap illusion.
+Future Codex tasks should add game content through these files when possible instead of hardcoding it into the gameplay loop. Run `npm run validate:quests` after quest content edits; validation reports duplicate IDs, broken prerequisites/rewards, target references, quest-giver metadata problems, and hidden/side/main progression safety warnings. Run `npm run test:quest-engine` for lightweight pure helper checks. To add another interior, define a readable `MapDefinition`, register it in `maps/index.ts`, and pair indoor/outdoor `map-exit` interactables with matching spawn IDs. Normal open Shower House doorways use automatic overlap transitions. Main Camp sets a modest `buildingFrontOverlap` that shortens outdoor building collision from the bottom while leaving each full building visual unchanged; a building can override it with `frontOverlap`. Doorway visuals are independent and can define their own `depth`, so future locked, special, or story-gated exits can omit automatic activation and continue to use the Action button. The canvas renderer uses a small named pass order—ground/background, terrain/decor, below actors, actors, then above actors—so outdoor building bodies and doors stay below the player while roofs and overhangs can cover actors for the top-down overlap illusion.
 
 ## Expanding the game
 
