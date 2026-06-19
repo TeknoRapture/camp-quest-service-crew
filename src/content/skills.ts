@@ -5,7 +5,7 @@ export const skills: Record<SkillId, SkillDefinition> = {
   nature: {
     id: 'nature',
     label: 'Nature Skills',
-    missingSkillMessage: 'Crazy Joe should probably teach you Nature Skills before you try that.',
+    missingSkillMessage: 'Ranger Eoj should probably teach you Nature Skills before you try that.',
   },
   swimming: {
     id: 'swimming',

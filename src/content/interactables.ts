@@ -10,7 +10,7 @@ export const interactables: InteractableDefinition[] = [
   { id: 'diningDelivery', kind: 'delivery-zone', label: 'Dining Hall delivery zone', x: 1960, y: 1210, w: 380, h: 255 },
   {
     id: 'blockedBridgeMessage', kind: 'message', label: 'Blocked Back 40 bridge', x: 3260, y: 2590, w: 200, h: 230,
-    message: 'Back 40 is closed for now. Crazy Joe says Outdoor Challenge is not ready yet.',
+    message: 'Back 40 is closed for now. Ranger Eoj says Outdoor Challenge is not ready yet.',
   },
   {
     id: 'back40TeaserMessage', kind: 'message', label: 'Back 40 under-construction teaser', x: 3285, y: 2815, w: 150, h: 60,
