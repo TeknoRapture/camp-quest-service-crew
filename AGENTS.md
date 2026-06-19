@@ -137,7 +137,7 @@ Possible bridge-blocking reasons:
 
 - “Bridge closed for inspection.”
 - “Outdoor Challenge hasn’t opened yet.”
-- “Crazy Joe says the Back 40 is not ready for Service Crew… yet.”
+- “Ranger Eoj says the Back 40 is not ready for Service Crew… yet.”
 - “A suspicious vulture is guarding the bridge.”
 - “The bridge is blocked by misplaced supply crates.”
 
@@ -146,7 +146,7 @@ The blocked bridge should make the world feel larger without requiring the full 
 ## NPCs
 
 - Cooper / “Coop”: Service Crew Director. Main checklist giver and service task supervisor.
-- Crazy Joe: Nature Program Director and Outdoor Challenge leader. Teaches Nature Skills and oversees the Back 40 / Outdoor Challenge territory.
+- Ranger Eoj: Nature Program Director and Outdoor Challenge leader. Teaches Nature Skills and oversees the Back 40 / Outdoor Challenge territory.
 - Gweggowy: Camp Director. Tracks overall camp readiness and unlocks the final rally objective.
 - Ethan: Camp Program Director. Gives program setup and supply delivery quests.
 - Cliff: BBEG tied to the camp ghost story and the Cliff area. Refine later.
@@ -275,7 +275,7 @@ Avoid mean-spirited humor. The comedy should come from camp chaos, missing suppl
 - Use Service Points as the score
 - Use Energy as the health/stamina meter
 - Save best score to localStorage
-- Include placeholder NPCs for Coop, Crazy Joe, Gweggowy, Ethan, and Cliff
+- Include placeholder NPCs for Coop, Ranger Eoj, Gweggowy, Ethan, and Cliff
 - Include a readable “Beware of Cliff!” sign near the Cliff Trail / Back 40 area, based on a supplied picture
 - Support using a supplied map picture as the visual reference for the camp layout
 
@@ -315,7 +315,7 @@ Tamed wildlife benefits:
 - Calmed bees may reveal hidden outdoor supplies or lead the player toward flowers, nature areas, or supply pickups
 - Calmed wasps may temporarily guard an area and keep other hazards away
 
-For Version 1, it is acceptable for Nature Skills to be simple. It can be unlocked by talking to Crazy Joe or completing a basic Outdoor Challenge task at Pioneer Point.
+For Version 1, it is acceptable for Nature Skills to be simple. It can be unlocked by talking to Ranger Eoj or completing a basic Outdoor Challenge task at Pioneer Point.
 
 ## Cliff sign
 
@@ -343,7 +343,7 @@ Example:
 
 Add a wilder camp region called the Back 40. This is Outdoor Challenge territory and includes Pioneer Point and Elite Landing.
 
-Crazy Joe is both the Nature Program Director and the leader of Outdoor Challenge. He is stationed in or near the Back 40 and teaches the player Nature Skills.
+Ranger Eoj is both the Nature Program Director and the leader of Outdoor Challenge. He is stationed in or near the Back 40 and teaches the player Nature Skills.
 
 For Version 1 / Day 1, the Back 40 should mostly be teased rather than fully playable because the bridge is blocked.
 
@@ -370,7 +370,7 @@ Back 40 gameplay for later expansion:
 8. Player restocks bathroom supplies.
 9. Player takes trash to the dumpster.
 10. Ethan requests supply deliveries for program setup.
-11. Crazy Joe mentions the Back 40 and Nature Skills, but the bridge is blocked for Day 1.
+11. Ranger Eoj mentions the Back 40 and Nature Skills, but the bridge is blocked for Day 1.
 12. Player sees or interacts with the blocked bridge and/or the “Beware of Cliff!” sign, based on the supplied picture.
 13. Player completes the checklist and reaches the rally circle.
 14. Gweggowy confirms camp readiness.
@@ -436,7 +436,7 @@ Back 40 / Outdoor Challenge:
 ## NPCs
 
 - Cooper / “Coop”: Service Crew Director. Main checklist giver and service task supervisor.
-- Crazy Joe: Nature Program Director and Outdoor Challenge leader. Teaches Nature Skills.
+- Ranger Eoj: Nature Program Director and Outdoor Challenge leader. Teaches Nature Skills.
 - Gweggowy: Camp Director. Tracks overall camp readiness and unlocks final rally objective.
 - Ethan: Camp Program Director. Gives program setup and supply delivery quests.
 - Cliff: BBEG tied to the camp ghost story and the Cliff area. Refine later.

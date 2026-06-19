@@ -1,6 +1,6 @@
 import type { HazardDefinition } from './types';
 
-const natureInteraction = { interactionSkill: 'nature', missingSkillMessage: 'Crazy Joe should probably teach you Nature Skills before you try that.' } as const;
+const natureInteraction = { interactionSkill: 'nature', missingSkillMessage: 'Ranger Eoj should probably teach you Nature Skills before you try that.' } as const;
 const nuisanceWildlifeDamage = { ...natureInteraction, mitigationSkill: 'nature', mitigationMultiplier: .5 } as const;
 
 // Hazards sit near, not on, the expanded camp's readable objective routes.
