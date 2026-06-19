@@ -69,7 +69,7 @@ function bottomGameplayOverlayInset() {
   const contentRect = renderedCanvasContentRect();
   const cssToGameY = canvas.height / Math.max(1, contentRect.height);
   const overlaySelectors = [
-    '#carry-summary', '.carry-summary', '.dialogue:not(.hidden)', '.image-inspection:not(.hidden)', '.checklist.open',
+    '#carry-summary', '.carry-summary',
     '#portrait-guidance:not(.dismissed)', '.right-control-gutter', '.left-control-gutter', 'footer', '.hud', '.objective',
   ];
   const seen = new Set<HTMLElement>();
@@ -260,17 +260,17 @@ function showDialogue(speaker: DialogueSpeaker, text: string) {
   ui.dialogue.style.setProperty('--dialogue-accent', speaker.accent ?? '#a43f28');
   ui.dialogue.classList.remove('portrait-missing'); ui.portraitPanel.classList.remove('hidden'); ui.portrait.alt = `Portrait of ${displayName}`;
   ui.portrait.onerror = () => { ui.dialogue.classList.add('portrait-missing'); ui.portraitPanel.classList.add('hidden'); ui.portrait.removeAttribute('src'); };
-  ui.portrait.src = speaker.portraits?.default ?? genericNpcPortrait; ui.dialogue.classList.remove('hidden'); scheduleLayoutRecalculation();
+  ui.portrait.src = speaker.portraits?.default ?? genericNpcPortrait; ui.dialogue.classList.remove('hidden');
 }
-function closeDialogue() { dialogueOpen = false; ui.dialogue.classList.add('hidden'); scheduleLayoutRecalculation(); }
+function closeDialogue() { dialogueOpen = false; ui.dialogue.classList.add('hidden'); }
 function inspectImage(title: string, assetId: AssetId, caption: string) {
   inspectionOpen = true; keys.clear(); ui.inspectionTitle.textContent = title; ui.inspectionCaption.textContent = caption;
   ui.inspectionImage.classList.remove('hidden'); ui.inspectionFallback.classList.add('hidden'); ui.inspectionImage.alt = title;
   ui.inspectionFallback.textContent = `${title} image unavailable`;
   ui.inspectionImage.onerror = () => { ui.inspectionImage.classList.add('hidden'); ui.inspectionFallback.classList.remove('hidden'); };
-  ui.inspectionImage.src = assets.url(assetId); ui.inspection.classList.remove('hidden'); scheduleLayoutRecalculation();
+  ui.inspectionImage.src = assets.url(assetId); ui.inspection.classList.remove('hidden');
 }
-function closeInspection() { inspectionOpen = false; ui.inspection.classList.add('hidden'); scheduleLayoutRecalculation(); }
+function closeInspection() { inspectionOpen = false; ui.inspection.classList.add('hidden'); }
 function toast(text: string) { ui.toast.textContent = text; ui.toast.classList.remove('hidden'); toastTimer = 2.8; }
 function dist(a: Rect, b: Rect) { return Math.hypot(a.x + a.w / 2 - b.x - b.w / 2, a.y + a.h / 2 - b.y - b.h / 2); }
 function intersects(a: Rect, b: Rect) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
@@ -577,7 +577,6 @@ const setChecklistOpen = (open: boolean) => {
   ui.checklist.classList.toggle('open', open);
   ui.checklist.setAttribute('aria-hidden', String(!open));
   checklistButton.setAttribute('aria-expanded', String(open));
-  scheduleLayoutRecalculation();
   requestAnimationFrame(updateChecklistScrollButtons);
 };
 const scrollChecklist = (direction: 1 | -1) => ui.tasks.scrollBy({ top: direction * 120, behavior: 'smooth' });
