@@ -87,7 +87,7 @@ export type QuestEvent =
   | { type: 'locationReached'; locationId: string; mapId: string }
   | { type: 'cleanTargetCompleted'; targetId: string; mapId: string }
   | { type: 'questFlagSet'; flag: string };
-export interface QuestEventResult { completedObjectives: { questId: QuestId; objectiveId: ObjectiveId }[]; completedQuests: QuestId[]; activatedQuests: QuestId[]; discoveredQuests: QuestId[]; rewards: QuestReward[]; messages: string[]; }
+export interface QuestEventResult { completedObjectives: { questId: QuestId; objectiveId: ObjectiveId }[]; completedQuests: QuestId[]; activatedQuests: QuestId[]; discoveredQuests: QuestId[]; rewards: QuestReward[]; messages: string[]; ignoredEvents: string[]; noOp: boolean; }
 export interface QuestRuntimeState {
   questStatuses: Record<QuestId, QuestStatus>;
   completedObjectiveIdsByQuest: Record<QuestId, Set<ObjectiveId>>;

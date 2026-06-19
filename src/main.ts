@@ -135,7 +135,7 @@ const state = {
 };
 const allItems = Object.values(maps).flatMap(map => map.items);
 const allNpcs = Object.values(maps).flatMap(map => map.npcs);
-const questValidationIssues = validateQuestDefinitions(quests, allNpcs);
+const questValidationIssues = validateQuestDefinitions(quests, { npcs: allNpcs, items: allItems, maps });
 if (questValidationIssues.length) console.warn('Quest definition validation issues:', questValidationIssues);
 const itemById = (id: string) => allItems.find(item => item.id === id);
 const itemCount = (id: string) => state.inventory.items[id] ?? 0;
