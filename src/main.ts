@@ -8,8 +8,8 @@ import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
 import { quests } from './content/quests';
-import { applyQuestRewards, createQuestState, getTrackedObjective, getVisibleObjectivesForQuest, getVisibleQuests, handleQuestEvent, isObjectiveComplete as isQuestObjectiveComplete, isObjectiveUnlocked as isQuestObjectiveUnlocked } from './questEngine';
-import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, ObjectiveDefinition, ObjectiveTargetType, QuestEvent, Rect, SkillId, TerrainFeature, Thing } from './content/types';
+import { applyQuestRewards, createQuestState, getTrackedObjective, getVisibleObjectivesForQuest, getVisibleQuests, handleNpcQuestInteraction, handleQuestEvent, isObjectiveComplete as isQuestObjectiveComplete, isObjectiveUnlocked as isQuestObjectiveUnlocked, validateQuestDefinitions, type NpcQuestInteractionResult } from './questEngine';
+import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, ObjectiveTargetType, QuestEvent, QuestEventResult, Rect, SkillId, TerrainFeature, Thing } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
@@ -129,11 +129,14 @@ const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 const state = {
-  talked: false, inventory: { items: {} as Record<string, number> }, largePickupOrder: [] as string[], rewardedPickups: new Set<string>(), delivered: false, bridge: false,
+  inventory: { items: {} as Record<string, number> }, largePickupOrder: [] as string[], rewardedPickups: new Set<string>(), delivered: false, bridge: false,
   quests: createQuestState(quests),
   skills: { nature: false, swimming: false, climbing: false } as Record<SkillId, boolean>,
 };
 const allItems = Object.values(maps).flatMap(map => map.items);
+const allNpcs = Object.values(maps).flatMap(map => map.npcs);
+const questValidationIssues = validateQuestDefinitions(quests, allNpcs);
+if (questValidationIssues.length) console.warn('Quest definition validation issues:', questValidationIssues);
 const itemById = (id: string) => allItems.find(item => item.id === id);
 const itemCount = (id: string) => state.inventory.items[id] ?? 0;
 const hasItem = (id: string) => itemCount(id) > 0;
@@ -185,13 +188,32 @@ function processQuestEvent(event: QuestEvent) {
   applyQuestRewards(state.quests, result, { addScore: award, showToast: toast, unlockSkill: skillId => { if (skillId in state.skills) state.skills[skillId as SkillId] = true; } });
   return result;
 }
+function processNpcQuestInteraction(npc: NPCDefinition) {
+  const result = handleNpcQuestInteraction(state.quests, allNpcs, quests, npc.id, currentMap.id);
+  applyQuestRewards(state.quests, result, { addScore: award, showToast: toast, unlockSkill: skillId => { if (skillId in state.skills) state.skills[skillId as SkillId] = true; } });
+  return result;
+}
 
-function completedObjectiveDialogue(result: ReturnType<typeof processQuestEvent>) {
+function completedObjectiveDialogue(result: QuestEventResult) {
   for (const completed of result.completedObjectives) {
     const quest = quests.find(candidate => candidate.id === completed.questId);
     const objective = quest?.objectives.find(candidate => candidate.id === completed.objectiveId);
     if (objective?.completionDialogue) return objective.completionDialogue;
   }
+}
+
+function npcHasCompletedTalkObjective(npc: NPCDefinition) {
+  return quests.some(quest => quest.objectives.some(objective => objective.type === 'talkToNpc' && objective.npcId === npc.id && isObjectiveComplete(quest.id, objective.id)));
+}
+
+function resolveNpcDialogue(npc: NPCDefinition, result: NpcQuestInteractionResult) {
+  const completionLine = completedObjectiveDialogue(result);
+  if (completionLine) return completionLine;
+  const lines = dialogue[npc.dialogueId] ?? [];
+  if (result.completedQuests.length > 0 && lines[1]) return lines[1];
+  if (result.startedQuestIds.length > 0 && lines[1]) return lines[1];
+  if (npcHasCompletedTalkObjective(npc) && lines[1]) return lines[1];
+  return lines[0] ?? 'Service Crew is on it!';
 }
 
 function completeBridgeObjective() {
@@ -299,9 +321,8 @@ function interact() {
   }
   const npc = currentMap.npcs.filter(({ id }) => id !== 'cliff').sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (npc && dist(player, npc) < 80) {
-    const result = processQuestEvent({ type: 'npcTalked', npcId: npc.id, mapId: currentMap.id });
-    if (result.completedObjectives.some(({ objectiveId }) => objectiveId === 'talked')) state.talked = true;
-    showDialogue(npc, completedObjectiveDialogue(result) ?? dialogue[npc.dialogueId][state.talked ? 1 : 0]); refreshUI(); return;
+    const result = processNpcQuestInteraction(npc);
+    showDialogue(npc, resolveNpcDialogue(npc, result)); refreshUI(); return;
   }
   const item = currentMap.items.filter(({ done }) => !done).sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (item && dist(player, item) < 70) {

@@ -7,10 +7,16 @@ export interface Point { x: number; y: number; }
 export interface MapSpawn extends Point { id: string; }
 export interface PortraitSet { default?: string; happy?: string; serious?: string; surprised?: string; }
 export interface DialogueSpeaker { displayName?: string; label?: string; accent?: string; portraits?: PortraitSet; }
-export interface NPCDefinition extends Thing { displayName?: string; accent?: string; portraits?: PortraitSet; dialogueId: string; }
 export type Dialogue = Record<string, readonly string[]>;
 export type QuestId = string;
 export type ObjectiveId = string;
+export interface NPCQuestGiverMetadata {
+  offersQuestIds?: QuestId[];
+  turnsInQuestIds?: QuestId[];
+  involvedQuestIds?: QuestId[];
+  questGiver?: boolean;
+}
+export interface NPCDefinition extends Thing { displayName?: string; accent?: string; portraits?: PortraitSet; dialogueId: string; quests?: NPCQuestGiverMetadata; }
 export type QuestCategory = 'main' | 'side' | 'hidden' | 'tutorial';
 export type QuestStatus = 'locked' | 'available' | 'active' | 'completed';
 export type ObjectiveTargetType = 'item' | 'npc' | 'interactable' | 'exit' | 'zone' | 'location';

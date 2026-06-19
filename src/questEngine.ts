@@ -1,4 +1,21 @@
-import type { ObjectiveDefinition, ObjectiveId, QuestDefinition, QuestEvent, QuestEventResult, QuestId, QuestPrerequisite, QuestReward, QuestRuntimeState, QuestStatus } from './content/types';
+import type { NPCDefinition, ObjectiveDefinition, ObjectiveId, QuestDefinition, QuestEvent, QuestEventResult, QuestId, QuestPrerequisite, QuestReward, QuestRuntimeState, QuestStatus } from './content/types';
+
+export interface NpcQuestState {
+  availableQuests: QuestDefinition[];
+  completableQuests: QuestDefinition[];
+  involvedActiveQuests: QuestDefinition[];
+  hasAvailableQuest: boolean;
+  hasCompletableQuest: boolean;
+  hasInvolvedActiveQuest: boolean;
+}
+
+export interface NpcQuestInteractionResult extends QuestEventResult {
+  npcQuestStateBefore: NpcQuestState;
+  npcQuestStateAfter: NpcQuestState;
+  offeredQuestIds: QuestId[];
+  startedQuestIds: QuestId[];
+  turnInQuestIds: QuestId[];
+}
 
 export function createQuestState(quests: QuestDefinition[]): QuestRuntimeState {
   const questStatuses: Record<QuestId, QuestStatus> = {};
@@ -23,6 +40,14 @@ export function createQuestState(quests: QuestDefinition[]): QuestRuntimeState {
 
 export function isRequiredForProgression(quest: QuestDefinition) {
   return quest.requiredForProgression ?? quest.category === 'main';
+}
+
+export function getBlockingProgressionQuests(quests: QuestDefinition[], questState: QuestRuntimeState) {
+  return quests.filter(quest => isRequiredForProgression(quest) && !isQuestCompleted(questState, quest));
+}
+
+export function isProgressionBlocked(quests: QuestDefinition[], questState: QuestRuntimeState) {
+  return getBlockingProgressionQuests(quests, questState).length > 0;
 }
 
 function prerequisiteMet(questState: QuestRuntimeState, prerequisite: QuestPrerequisite) {
@@ -70,10 +95,18 @@ export function isQuestCompleted(questState: QuestRuntimeState, quest: QuestDefi
 }
 
 export function isQuestVisible(questState: QuestRuntimeState, quest: QuestDefinition) {
-  if (quest.category === 'hidden') return isQuestCompleted(questState, quest);
+  if (quest.category === 'hidden') return isHiddenQuestVisibleInChecklist(questState, quest);
   if (quest.hiddenUntilDiscovered && !questState.discoveredQuestIds.has(quest.id)) return false;
   const status = questState.questStatuses[quest.id] ?? 'locked';
   return status === 'active' || status === 'completed' || status === 'available' || Boolean(quest.previewWhenLocked);
+}
+
+export function isHiddenQuestVisibleInChecklist(questState: QuestRuntimeState, quest: QuestDefinition) {
+  return quest.category === 'hidden' && isQuestCompleted(questState, quest);
+}
+
+export function shouldShowQuestInChecklist(questState: QuestRuntimeState, quest: QuestDefinition) {
+  return isQuestVisible(questState, quest);
 }
 
 export function getVisibleQuests(quests: QuestDefinition[], questState: QuestRuntimeState) {
@@ -113,6 +146,64 @@ export function getTrackedObjective(quests: QuestDefinition[], questState: Quest
   if (optional) return { quest: optional, objective: getActiveObjectiveForQuest(questState, optional)! };
 
   return undefined;
+}
+
+function findNpc(npcId: string, npcs: readonly NPCDefinition[]) {
+  return npcs.find(npc => npc.id === npcId);
+}
+
+function questByIds(questIds: readonly QuestId[] | undefined, quests: readonly QuestDefinition[]) {
+  if (!questIds?.length) return [];
+  const requested = new Set(questIds);
+  return quests.filter(quest => requested.has(quest.id));
+}
+
+function questCanAppearAsNpcOffer(questState: QuestRuntimeState, quest: QuestDefinition) {
+  if (isQuestCompleted(questState, quest) || isQuestActive(questState, quest)) return false;
+  if (quest.category === 'hidden' && !questState.discoveredQuestIds.has(quest.id)) return false;
+  return true;
+}
+
+export function canNpcOfferQuest(npcId: string, npcs: readonly NPCDefinition[], quest: QuestDefinition, questState: QuestRuntimeState) {
+  const npc = findNpc(npcId, npcs);
+  if (!npc?.quests?.offersQuestIds?.includes(quest.id)) return false;
+  if (!questCanAppearAsNpcOffer(questState, quest)) return false;
+  return prerequisitesMet(questState, quest);
+}
+
+export function canNpcCompleteQuest(npcId: string, npcs: readonly NPCDefinition[], quest: QuestDefinition, questState: QuestRuntimeState) {
+  const npc = findNpc(npcId, npcs);
+  if (!npc?.quests?.turnsInQuestIds?.includes(quest.id)) return false;
+  return isQuestActive(questState, quest) && !isQuestCompleted(questState, quest) && isQuestReadyToComplete(questState, quest);
+}
+
+export function getAvailableQuestsForNpc(npcId: string, npcs: readonly NPCDefinition[], quests: QuestDefinition[], questState: QuestRuntimeState) {
+  const npc = findNpc(npcId, npcs);
+  return questByIds(npc?.quests?.offersQuestIds, quests).filter(quest => canNpcOfferQuest(npcId, npcs, quest, questState));
+}
+
+export function getCompletableQuestsForNpc(npcId: string, npcs: readonly NPCDefinition[], quests: QuestDefinition[], questState: QuestRuntimeState) {
+  const npc = findNpc(npcId, npcs);
+  return questByIds(npc?.quests?.turnsInQuestIds, quests).filter(quest => canNpcCompleteQuest(npcId, npcs, quest, questState));
+}
+
+export function getInvolvedQuestsForNpc(npcId: string, npcs: readonly NPCDefinition[], quests: QuestDefinition[], questState: QuestRuntimeState) {
+  const npc = findNpc(npcId, npcs);
+  return questByIds(npc?.quests?.involvedQuestIds, quests).filter(quest => isQuestActive(questState, quest) && isQuestVisible(questState, quest));
+}
+
+export function getNpcQuestState(npcId: string, npcs: readonly NPCDefinition[], quests: QuestDefinition[], questState: QuestRuntimeState): NpcQuestState {
+  const availableQuests = getAvailableQuestsForNpc(npcId, npcs, quests, questState);
+  const completableQuests = getCompletableQuestsForNpc(npcId, npcs, quests, questState);
+  const involvedActiveQuests = getInvolvedQuestsForNpc(npcId, npcs, quests, questState);
+  return {
+    availableQuests,
+    completableQuests,
+    involvedActiveQuests,
+    hasAvailableQuest: availableQuests.length > 0,
+    hasCompletableQuest: completableQuests.length > 0,
+    hasInvolvedActiveQuest: involvedActiveQuests.length > 0,
+  };
 }
 
 function completeObjective(questState: QuestRuntimeState, quest: QuestDefinition, objective: ObjectiveDefinition) {
@@ -179,6 +270,21 @@ export function handleQuestEvent(questState: QuestRuntimeState, quests: QuestDef
   return result;
 }
 
+export function handleNpcQuestInteraction(questState: QuestRuntimeState, npcs: readonly NPCDefinition[], quests: QuestDefinition[], npcId: string, mapId: string): NpcQuestInteractionResult {
+  const npcQuestStateBefore = getNpcQuestState(npcId, npcs, quests, questState);
+  const offeredQuestIds = npcQuestStateBefore.availableQuests.map(quest => quest.id);
+  const eventResult = handleQuestEvent(questState, quests, { type: 'npcTalked', npcId, mapId });
+  const startedQuestIds: QuestId[] = [...eventResult.activatedQuests];
+
+  for (const quest of npcQuestStateBefore.availableQuests) {
+    if (activateQuest(questState, quest)) startedQuestIds.push(quest.id);
+  }
+
+  const npcQuestStateAfter = getNpcQuestState(npcId, npcs, quests, questState);
+  const turnInQuestIds = npcQuestStateBefore.completableQuests.map(quest => quest.id);
+  return { ...eventResult, npcQuestStateBefore, npcQuestStateAfter, offeredQuestIds, startedQuestIds, turnInQuestIds };
+}
+
 export function applyQuestRewards(questState: QuestRuntimeState, result: QuestEventResult, handlers: { addScore?: (amount: number) => void; showToast?: (text: string) => void; unlockSkill?: (skillId: string) => void; unlockGate?: (gateId: string) => void } = {}) {
   for (const reward of result.rewards) applyQuestReward(questState, reward, handlers);
   for (const message of result.messages) handlers.showToast?.(message);
@@ -194,4 +300,39 @@ function applyQuestReward(questState: QuestRuntimeState, reward: QuestReward, ha
     case 'unlockGate': questState.flags[`gate:${reward.gateId}`] = true; handlers.unlockGate?.(reward.gateId); break;
     case 'unlockSkill': questState.flags[`skill:${reward.skillId}`] = true; handlers.unlockSkill?.(reward.skillId); break;
   }
+}
+
+export function validateQuestDefinitions(quests: QuestDefinition[], npcs: readonly NPCDefinition[] = []) {
+  const issues: string[] = [];
+  const questIds = new Set<QuestId>();
+  for (const quest of quests) {
+    if (questIds.has(quest.id)) issues.push(`Duplicate quest id: ${quest.id}`);
+    questIds.add(quest.id);
+
+    const objectiveIds = new Set<ObjectiveId>();
+    for (const objective of quest.objectives) {
+      if (objectiveIds.has(objective.id)) issues.push(`Duplicate objective id "${objective.id}" in quest "${quest.id}"`);
+      objectiveIds.add(objective.id);
+    }
+    for (const objective of quest.objectives) {
+      for (const prerequisiteId of objective.prerequisiteObjectiveIds ?? []) {
+        if (!objectiveIds.has(prerequisiteId)) issues.push(`Quest "${quest.id}" objective "${objective.id}" references missing prerequisite objective "${prerequisiteId}"`);
+      }
+      for (const reward of objective.rewards ?? []) {
+        if ((reward.type === 'activateQuest' || reward.type === 'discoverQuest') && !questIds.has(reward.questId) && !quests.some(candidate => candidate.id === reward.questId)) issues.push(`Quest "${quest.id}" objective "${objective.id}" reward references missing quest "${reward.questId}"`);
+      }
+    }
+    for (const reward of quest.rewards ?? []) {
+      if ((reward.type === 'activateQuest' || reward.type === 'discoverQuest') && !questIds.has(reward.questId) && !quests.some(candidate => candidate.id === reward.questId)) issues.push(`Quest "${quest.id}" reward references missing quest "${reward.questId}"`);
+    }
+  }
+
+  for (const npc of npcs) {
+    const referencedQuestIds = [...(npc.quests?.offersQuestIds ?? []), ...(npc.quests?.turnsInQuestIds ?? []), ...(npc.quests?.involvedQuestIds ?? [])];
+    for (const questId of referencedQuestIds) {
+      if (!questIds.has(questId)) issues.push(`NPC "${npc.id}" quest metadata references missing quest "${questId}"`);
+    }
+  }
+
+  return issues;
 }
