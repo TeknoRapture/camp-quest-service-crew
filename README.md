@@ -2,13 +2,14 @@
 
 A small, mobile-first retro camp adventure built as a static browser game. The morning bell has rung, but Service Crew cannot start until somebody solves the ancient mystery: **who took the mop?**
 
-This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue with reusable portraits, collision, hazards, supply pickups, a delivery, a Service Checklist, Energy, Service Points, a saved best score, skill-gated terrain, and an expanded 4800 × 3200 Main Camp with denser culled woods, a northern gorge trail and Tree House landmark, and an objective-gated bridge teasing the Back 40. It also includes an incremental SVG sprite pipeline with shape-drawing fallbacks and reusable image inspection overlays.
+This initial playable foundation includes a canvas-rendered Main Camp, touch and keyboard controls, NPC dialogue with reusable portraits, collision, hazards, supply pickups, a delivery, a collapsible Service Checklist with compact quest tracking, Energy, Service Points, a saved best score, skill-gated terrain, and an expanded 4800 × 3200 Main Camp with denser culled woods, a northern gorge trail and Tree House landmark, and an objective-gated bridge teasing the Back 40. It also includes an incremental SVG sprite pipeline with shape-drawing fallbacks and reusable image inspection overlays.
 
 ## Play
 
 - **Phone:** use the on-screen D-pad and large **ACTION** button.
 - **Desktop:** move with WASD or arrow keys; interact with Space or E.
 - Talk to Coop by the Welcome Center, recover supplies, deliver the crate to the Dining Hall, and walk into the Shower House doorway to explore the proof-of-concept interior.
+- Open the Service Checklist to expand or collapse quest categories and questlines. Tap an active quest or objective row to track it; tap the tracked quest again to return to the default main-objective priority.
 - Mud, wet floors, and camp creatures slow movement. Lake and stream terrain require Swimming, while gorge terrain requires Climbing. All skills currently start locked.
 - Mosquito clouds reduce Energy. Their content metadata prepares Nature Skills to reduce nuisance-wildlife damage once that skill can be unlocked.
 
