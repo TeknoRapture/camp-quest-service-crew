@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "validate:quests": "esbuild scripts/validate-quests.ts --bundle --platform=node --format=esm --outfile=.quest-check/validate-quests.mjs && node .quest-check/validate-quests.mjs",
-    "test:quest-engine": "esbuild scripts/quest-engine-checks.ts --bundle --platform=node --format=esm --outfile=.quest-check/quest-engine-checks.mjs && node .quest-check/quest-engine-checks.mjs"
+    "test:quest-engine": "esbuild scripts/quest-engine-checks.ts --bundle --platform=node --format=esm --outfile=.quest-check/quest-engine-checks.mjs && node .quest-check/quest-engine-checks.mjs",
+    "validate:dialogue": "esbuild scripts/validate-dialogue.ts --bundle --platform=node --format=esm --outfile=.quest-check/validate-dialogue.mjs && node .quest-check/validate-dialogue.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.2",

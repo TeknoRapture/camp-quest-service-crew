@@ -1,6 +1,6 @@
-import type { Dialogue } from './types';
+import type { Dialogue, DialogueTopic } from './types';
 
-// Add future NPC conversations and story messages here, keyed by a stable dialogue ID.
+// Legacy story/default lines kept while NPCs migrate to topic-based dialogue.
 export const dialogue: Dialogue = {
   opening: ['Morning bell! Find me by the Welcome Center. The supplies have apparently begun their annual migration.'],
   coop: [
@@ -21,3 +21,36 @@ export const dialogue: Dialogue = {
   ],
   cliff: ['...', 'A shadow slips deeper into the Back 40.'],
 };
+
+export const dialogueTopics: DialogueTopic[] = [
+  {
+    id: 'coop.serviceList',
+    npcId: 'coop',
+    label: 'Ask for the Service Crew list',
+    priority: 900,
+    conditions: [
+      { type: 'objectiveUnlocked', questId: 'morningSupplyScramble', objectiveId: 'talked' },
+      { type: 'objectiveCompleted', questId: 'morningSupplyScramble', objectiveId: 'talked', invert: true },
+    ],
+    response: dialogue.coop[1],
+    effects: [{ type: 'runNpcQuestInteraction', npcId: 'coop' }],
+  },
+  {
+    id: 'coop.cliffSign',
+    npcId: 'coop',
+    label: 'Ask about the Cliff sign',
+    priority: 650,
+    conditions: [{ type: 'questFlag', flag: 'cliffSignInspected', value: true }],
+    response: 'That sign? It has been warning campers longer than the lost-and-found bin has been collecting single socks. If you saw the symbol, stay cheerful... and stay on the Main Camp side of the bridge for now.',
+    effects: [{ type: 'setDialogueFlag', flag: 'coopDiscussedCliffSign', value: true }],
+  },
+  {
+    id: 'coop.default',
+    npcId: 'coop',
+    label: 'Chat with Coop',
+    priority: 0,
+    isDefault: true,
+    response: dialogue.coop[0],
+    effects: [{ type: 'runNpcQuestInteraction', npcId: 'coop' }],
+  },
+];
