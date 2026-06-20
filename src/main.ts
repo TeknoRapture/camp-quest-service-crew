@@ -224,7 +224,8 @@ function isQuestTrackable(quest: QuestDefinition) {
 function checklistToggle(key: string, label: string, depth: number, questsForProgress: QuestDefinition[]) {
   const collapsed = collapsedChecklistRows.has(key);
   const progress = progressForQuests(questsForProgress);
-  return `<li class="checklist-row checklist-toggle depth-${depth}" data-action="toggle-checklist" data-key="${escapeHtml(key)}" role="button" tabindex="0"><span class="twisty">${collapsed ? '▸' : '▾'}</span><span>${escapeHtml(label)}</span>${progress ? `<b>${progress}</b>` : ''}</li>`;
+  const rowClass = depth === 0 ? 'quest-category-row' : 'questline-row';
+  return `<li class="checklist-row checklist-toggle ${rowClass} depth-${depth}" data-action="toggle-checklist" data-key="${escapeHtml(key)}" role="button" tabindex="0"><span class="twisty">${collapsed ? '▸' : '▾'}</span><span>${escapeHtml(label)}</span>${progress ? `<b>${progress}</b>` : ''}</li>`;
 }
 function checklistQuestRow(quest: QuestDefinition, depth: number) {
   const trackable = isQuestTrackable(quest);
