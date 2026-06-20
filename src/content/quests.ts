@@ -49,5 +49,48 @@ export const inspectCliffSignQuest: QuestDefinition = {
   ],
 };
 
+export const trailMarkerCheckQuest: QuestDefinition = {
+  id: 'trailMarkerCheck',
+  title: 'Trail Marker Check',
+  summary: 'Ranger Eoj wants a quick Service Crew check-in before anyone wanders toward Outdoor Challenge.',
+  category: 'side',
+  questlineId: 'campErrands',
+  sequence: 1,
+  requiredForProgression: false,
+  objectives: [
+    {
+      id: 'checkIn',
+      label: 'Check in with Ranger Eoj near the Back 40 bridge',
+      type: 'talkToNpc',
+      npcId: 'crazyjoe',
+      mapId: 'mainCamp',
+      target: { type: 'npc', id: 'crazyjoe', mapId: 'mainCamp', label: 'Ranger Eoj' },
+      completionDialogue: 'Trail marker status: still mysterious, still closed, and still not a Nature Skills class.',
+      rewards: [{ type: 'addScore', amount: 15 }],
+    },
+  ],
+  rewards: [{ type: 'showToast', text: 'Optional errand complete: Ranger Eoj approves the trail marker check.' }],
+};
 
-export const quests: QuestDefinition[] = [morningSupplyScrambleQuest, inspectCliffSignQuest];
+export const showerHouseHeadcountQuest: QuestDefinition = {
+  id: 'showerHouseHeadcount',
+  title: 'Shower House Headcount',
+  summary: 'Coop wants one quick peek inside the Shower House before the real cleaning sprint begins.',
+  category: 'side',
+  questlineId: 'morningServiceCrew',
+  sequence: 2,
+  requiredForProgression: false,
+  objectives: [
+    {
+      id: 'enterShowerHouse',
+      label: 'Step inside the Shower House',
+      type: 'enterArea',
+      mapId: 'showerHouse',
+      target: { type: 'exit', id: 'showerHouseEntrance', mapId: 'mainCamp', label: 'Shower House door' },
+      rewards: [{ type: 'addScore', amount: 15 }],
+    },
+  ],
+  rewards: [{ type: 'showToast', text: 'Optional errand complete: Shower House accounted for.' }],
+};
+
+export const quests: QuestDefinition[] = [morningSupplyScrambleQuest, showerHouseHeadcountQuest, trailMarkerCheckQuest, inspectCliffSignQuest];
