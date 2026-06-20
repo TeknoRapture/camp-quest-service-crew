@@ -1,7 +1,8 @@
 import './style.css';
 import { AssetLoader, type AssetId, type AssetProgress } from './assets';
 import { drawSprite } from './sprites';
-import { dialogue } from './content/dialogue';
+import { dialogue, dialogueTopics } from './content/dialogue';
+import { getValidDialogueTopics, meaningfulDialogueTopics, validateDialogueTopics } from './dialogueEngine';
 import { maps, mainCamp } from './content/maps';
 import { chooseLoadingTip } from './content/loadingTips';
 import { blockedBridge } from './content/locations';
@@ -9,7 +10,7 @@ import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
 import { quests } from './content/quests';
 import { applyQuestRewards, createQuestState, getTrackedObjective, getVisibleObjectivesForQuest, getVisibleQuests, handleNpcQuestInteraction, handleQuestEvent, isObjectiveComplete as isQuestObjectiveComplete, isObjectiveUnlocked as isQuestObjectiveUnlocked, validateQuestDefinitions, type NpcQuestInteractionResult } from './questEngine';
-import type { DialogueSpeaker, InteractableDefinition, LocationDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, ObjectiveTargetType, QuestDefinition, QuestEvent, QuestEventResult, QuestId, Rect, SkillId, TerrainFeature, Thing } from './content/types';
+import type { DialogueEffect, DialogueSpeaker, DialogueTopic, InteractableDefinition, LocationDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, ObjectiveTargetType, QuestDefinition, QuestEvent, QuestEventResult, QuestId, Rect, SkillId, TerrainFeature, Thing } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
@@ -23,6 +24,7 @@ const ui = {
   points: document.querySelector('#points')!, best: document.querySelector('#best')!, tasks: document.querySelector('#tasks')!,
   dialogue: document.querySelector<HTMLElement>('#dialogue')!, speaker: document.querySelector('#speaker')!, text: document.querySelector('#dialogue-text')!,
   portraitPanel: document.querySelector('#portrait-panel')!, portrait: document.querySelector<HTMLImageElement>('#dialogue-portrait')!,
+  choices: document.createElement('div'), hint: document.querySelector('#dialogue small')!,
   toast: document.querySelector('#toast')!, checklist: document.querySelector('#checklist')!,
   inspection: document.querySelector('#image-inspection')!, inspectionImage: document.querySelector<HTMLImageElement>('#inspection-image')!,
   inspectionTitle: document.querySelector('#inspection-title')!, inspectionCaption: document.querySelector('#inspection-caption')!,
@@ -128,16 +130,25 @@ function updateCamera() {
 const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
+type DialogueUiState = { mode: 'closed' } | { mode: 'choosingTopic'; speaker: DialogueSpeaker; topics: DialogueTopic[]; selectedIndex: number } | { mode: 'showingResponse'; speaker: DialogueSpeaker; topicId?: string; response: string };
+let dialogueUiState: DialogueUiState = { mode: 'closed' };
 const collapsedChecklistRows = new Set<string>();
 const state = {
   inventory: { items: {} as Record<string, number> }, largePickupOrder: [] as string[], rewardedPickups: new Set<string>(), delivered: false, bridge: false,
   quests: createQuestState(quests),
+  dialogue: { flags: {} as Record<string, boolean | string | number>, seenTopicIds: new Set<string>() },
   skills: { nature: false, swimming: false, climbing: false } as Record<SkillId, boolean>,
 };
+ui.choices.className = 'dialogue-choices';
+ui.choices.setAttribute('aria-label', 'Dialogue topics');
+ui.text.insertAdjacentElement('afterend', ui.choices);
+
 const allItems = Object.values(maps).flatMap(map => map.items);
 const allNpcs = Object.values(maps).flatMap(map => map.npcs);
 const questValidationIssues = validateQuestDefinitions(quests, { npcs: allNpcs, items: allItems, maps });
 if (questValidationIssues.length) console.warn('Quest definition validation issues:', questValidationIssues);
+const dialogueValidationIssues = validateDialogueTopics(dialogueTopics, { npcs: allNpcs, quests, items: allItems, maps });
+if (dialogueValidationIssues.length) console.warn('Dialogue topic validation issues:', dialogueValidationIssues);
 const itemById = (id: string) => allItems.find(item => item.id === id);
 const itemCount = (id: string) => state.inventory.items[id] ?? 0;
 const hasItem = (id: string) => itemCount(id) > 0;
@@ -325,15 +336,71 @@ function refreshUI() {
   ui.carrySummary.textContent = [`Hands: ${hands}`, tray.length ? `Tray: ${tray.join(', ')}` : '', small.length ? `Small: ${small.join(', ')}` : ''].filter(Boolean).join(' · ');
   ui.dropButton.disabled = state.largePickupOrder.length === 0;
 }
-function showDialogue(speaker: DialogueSpeaker, text: string) {
+function setDialogueSpeaker(speaker: DialogueSpeaker) {
   const displayName = speaker.displayName ?? speaker.label ?? 'Camp Staff';
-  dialogueOpen = true; ui.speaker.textContent = displayName; ui.text.textContent = text;
+  dialogueOpen = true; ui.speaker.textContent = displayName;
   ui.dialogue.style.setProperty('--dialogue-accent', speaker.accent ?? '#a43f28');
   ui.dialogue.classList.remove('portrait-missing'); ui.portraitPanel.classList.remove('hidden'); ui.portrait.alt = `Portrait of ${displayName}`;
   ui.portrait.onerror = () => { ui.dialogue.classList.add('portrait-missing'); ui.portraitPanel.classList.add('hidden'); ui.portrait.removeAttribute('src'); };
   ui.portrait.src = speaker.portraits?.default ?? genericNpcPortrait; ui.dialogue.classList.remove('hidden');
 }
-function closeDialogue() { dialogueOpen = false; ui.dialogue.classList.add('hidden'); }
+function showDialogue(speaker: DialogueSpeaker, text: string, topicId?: string) {
+  setDialogueSpeaker(speaker); dialogueUiState = { mode: 'showingResponse', speaker, topicId, response: text };
+  ui.text.textContent = text; ui.choices.replaceChildren(); ui.hint.textContent = 'Tap ACTION to continue';
+}
+function closeDialogue() { dialogueOpen = false; dialogueUiState = { mode: 'closed' }; ui.choices.replaceChildren(); ui.dialogue.classList.add('hidden'); }
+function focusDialogueChoice(index: number) {
+  const buttons = Array.from(ui.choices.querySelectorAll<HTMLButtonElement>('button'));
+  buttons[index]?.focus({ preventScroll: true });
+}
+function showTopicChoices(speaker: DialogueSpeaker, topics: DialogueTopic[]) {
+  setDialogueSpeaker(speaker); dialogueUiState = { mode: 'choosingTopic', speaker, topics, selectedIndex: 0 };
+  ui.text.textContent = 'What do you want to ask?'; ui.hint.textContent = 'Choose a topic · Escape closes';
+  ui.choices.replaceChildren(...topics.map((topic, index) => {
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = topic.label; button.dataset.topicId = topic.id;
+    button.addEventListener('click', () => runDialogueTopic(speaker, topic));
+    if (index === 0) button.classList.add('selected');
+    return button;
+  }));
+  focusDialogueChoice(0);
+}
+function updateTopicSelection(delta: 1 | -1) {
+  if (dialogueUiState.mode !== 'choosingTopic') return false;
+  const nextIndex = (dialogueUiState.selectedIndex + delta + dialogueUiState.topics.length) % dialogueUiState.topics.length;
+  dialogueUiState.selectedIndex = nextIndex;
+  Array.from(ui.choices.querySelectorAll<HTMLButtonElement>('button')).forEach((button, index) => button.classList.toggle('selected', index === nextIndex));
+  focusDialogueChoice(nextIndex); return true;
+}
+function selectHighlightedTopic() {
+  if (dialogueUiState.mode !== 'choosingTopic') return false;
+  runDialogueTopic(dialogueUiState.speaker, dialogueUiState.topics[dialogueUiState.selectedIndex]); return true;
+}
+function applyDialogueEffect(effect: DialogueEffect) {
+  if (effect.type === 'emitQuestEvent') return processQuestEvent(effect.event);
+  if (effect.type === 'runNpcQuestInteraction') {
+    const npc = effect.npcId ? allNpcs.find(candidate => candidate.id === effect.npcId) : undefined;
+    if (npc) return processNpcQuestInteraction(npc);
+    return;
+  }
+  if (effect.type === 'setDialogueFlag') { state.dialogue.flags[effect.flag] = effect.value ?? true; return; }
+  if (effect.type === 'setQuestFlag') { state.quests.flags[effect.flag] = effect.value ?? true; return processQuestEvent({ type: 'questFlagSet', flag: effect.flag }); }
+  if (effect.type === 'showToast') { toast(effect.text); return; }
+}
+function runDialogueTopic(speaker: DialogueSpeaker, topic: DialogueTopic) {
+  for (const effect of topic.effects ?? []) applyDialogueEffect(effect);
+  state.dialogue.seenTopicIds.add(topic.id);
+  showDialogue(speaker, topic.response, topic.id); refreshUI();
+}
+function startNpcDialogue(npc: NPCDefinition) {
+  const topics = getValidDialogueTopics(dialogueTopics, { npc, mapId: currentMap.id, npcs: allNpcs, quests, questState: state.quests, dialogueState: state.dialogue, heldItemCount: itemCount });
+  const meaningfulTopics = meaningfulDialogueTopics(topics);
+  if (meaningfulTopics.length > 1) { showTopicChoices(npc, meaningfulTopics); return; }
+  if (meaningfulTopics.length === 1) { runDialogueTopic(npc, meaningfulTopics[0]); return; }
+  const defaultTopic = topics.find(topic => topic.isDefault);
+  if (defaultTopic) { runDialogueTopic(npc, defaultTopic); return; }
+  const result = processNpcQuestInteraction(npc);
+  showDialogue(npc, resolveNpcDialogue(npc, result)); refreshUI();
+}
 function inspectImage(title: string, assetId: AssetId, caption: string) {
   inspectionOpen = true; keys.clear(); ui.inspectionTitle.textContent = title; ui.inspectionCaption.textContent = caption;
   ui.inspectionImage.classList.remove('hidden'); ui.inspectionFallback.classList.add('hidden'); ui.inspectionImage.alt = title;
@@ -362,7 +429,7 @@ function tryAutomaticExit() {
 }
 function interact() {
   if (inspectionOpen) { closeInspection(); return; }
-  if (dialogueOpen) { closeDialogue(); return; }
+  if (dialogueOpen) { if (!selectHighlightedTopic()) closeDialogue(); return; }
 
   const nearbyExit = currentMap.exits.find(exit => exit.activation !== 'automatic' && dist(player, exit) < 85);
   if (nearbyExit) { switchMap(nearbyExit); return; }
@@ -392,8 +459,7 @@ function interact() {
   }
   const npc = currentMap.npcs.filter(({ id }) => id !== 'cliff').sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (npc && dist(player, npc) < 80) {
-    const result = processNpcQuestInteraction(npc);
-    showDialogue(npc, resolveNpcDialogue(npc, result)); refreshUI(); return;
+    startNpcDialogue(npc); return;
   }
   const item = currentMap.items.filter(({ done }) => !done).sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (item && dist(player, item) < 70) {
@@ -614,6 +680,12 @@ let last = performance.now(); function loop(now: number) { const dt = Math.min((
 const keyMap: Record<string, string> = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
 addEventListener('keydown', event => {
   if (gamePhase !== 'playing') { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); startGame(); } return; }
+  if (dialogueUiState.mode === 'choosingTopic') {
+    if (['ArrowUp', 'w', 'W'].includes(event.key)) { updateTopicSelection(-1); event.preventDefault(); return; }
+    if (['ArrowDown', 's', 'S'].includes(event.key)) { updateTopicSelection(1); event.preventDefault(); return; }
+    if (['Enter', ' ', 'e', 'E'].includes(event.key)) { selectHighlightedTopic(); event.preventDefault(); return; }
+  }
+  if (dialogueOpen && ['Enter', ' ', 'e', 'E'].includes(event.key)) { closeDialogue(); event.preventDefault(); return; }
   if (keyMap[event.key]) { keys.add(keyMap[event.key]); event.preventDefault(); }
   if (['q', 'Q'].includes(event.key)) { dropLastLargeItem(); event.preventDefault(); }
   if ([' ', 'e', 'E'].includes(event.key)) { actionQueued = true; event.preventDefault(); }

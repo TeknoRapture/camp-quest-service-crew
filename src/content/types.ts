@@ -8,6 +8,8 @@ export interface MapSpawn extends Point { id: string; }
 export interface PortraitSet { default?: string; happy?: string; serious?: string; surprised?: string; }
 export interface DialogueSpeaker { displayName?: string; label?: string; accent?: string; portraits?: PortraitSet; }
 export type Dialogue = Record<string, readonly string[]>;
+export type DialogueTopicId = string;
+export type DialogueGroupId = string;
 export type QuestId = string;
 export type ObjectiveId = string;
 export interface NPCQuestGiverMetadata {
@@ -87,6 +89,38 @@ export type QuestEvent =
   | { type: 'locationReached'; locationId: string; mapId: string }
   | { type: 'cleanTargetCompleted'; targetId: string; mapId: string }
   | { type: 'questFlagSet'; flag: string };
+export type DialogueCondition =
+  | { type: 'questStatus'; questId: QuestId; status: QuestStatus; invert?: boolean }
+  | { type: 'questCompleted'; questId: QuestId; invert?: boolean }
+  | { type: 'objectiveCompleted'; questId: QuestId; objectiveId: ObjectiveId; invert?: boolean }
+  | { type: 'objectiveUnlocked'; questId: QuestId; objectiveId: ObjectiveId; invert?: boolean }
+  | { type: 'questFlag'; flag: string; value?: boolean | string | number; invert?: boolean }
+  | { type: 'dialogueFlag'; flag: string; value?: boolean | string | number; invert?: boolean }
+  | { type: 'itemHeld'; itemId: string; invert?: boolean }
+  | { type: 'npcHasAvailableQuest'; npcId?: string; invert?: boolean }
+  | { type: 'npcHasCompletableQuest'; npcId?: string; invert?: boolean }
+  | { type: 'always'; invert?: boolean };
+export type DialogueEffect =
+  | { type: 'emitQuestEvent'; event: QuestEvent }
+  | { type: 'runNpcQuestInteraction'; npcId?: string }
+  | { type: 'setDialogueFlag'; flag: string; value?: boolean | string | number }
+  | { type: 'setQuestFlag'; flag: string; value?: boolean | string | number }
+  | { type: 'showToast'; text: string };
+export interface DialogueTopic {
+  id: DialogueTopicId;
+  npcId?: string;
+  groupId?: DialogueGroupId;
+  label: string;
+  priority?: number;
+  conditions?: DialogueCondition[];
+  response: string;
+  effects?: DialogueEffect[];
+  repeatable?: boolean;
+  once?: boolean;
+  hideAfterComplete?: boolean;
+  isDefault?: boolean;
+  nextTopicIds?: DialogueTopicId[];
+}
 export interface QuestEventResult { completedObjectives: { questId: QuestId; objectiveId: ObjectiveId }[]; completedQuests: QuestId[]; activatedQuests: QuestId[]; discoveredQuests: QuestId[]; rewards: QuestReward[]; messages: string[]; ignoredEvents: string[]; noOp: boolean; }
 export interface QuestRuntimeState {
   questStatuses: Record<QuestId, QuestStatus>;
