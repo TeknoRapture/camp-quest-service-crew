@@ -9,11 +9,17 @@
   <body>
     <main id="game-shell">
       <section class="left-control-gutter" aria-label="Movement controls">
-        <div class="dpad">
+        <button id="control-mode-toggle" class="control-mode-toggle" type="button" aria-live="polite">Controls: D-pad</button>
+        <div class="dpad" data-control-panel="dpad">
           <button data-dir="up" aria-label="Move up">▲</button>
           <button data-dir="left" aria-label="Move left">◀</button>
           <button data-dir="down" aria-label="Move down">▼</button>
           <button data-dir="right" aria-label="Move right">▶</button>
+        </div>
+        <div id="joystick" class="joystick" data-control-panel="joystick" aria-label="Joystick movement control">
+          <div id="joystick-base" class="joystick-base">
+            <div id="joystick-knob" class="joystick-knob"></div>
+          </div>
         </div>
       </section>
       <section class="center-stage">
@@ -55,7 +61,7 @@
         <button id="drop-button" class="round secondary drop" disabled>DROP<small>Q</small></button>
         <button id="checklist-button" class="round secondary" aria-expanded="false" aria-controls="checklist">LIST</button>
       </section>
-      <footer>Move with the D-pad or WASD / arrows · Action with Space or E · Drop bulky item with Q</footer>
+      <footer>Move with D-pad/joystick or WASD / arrows · Action with Space or E · Drop bulky item with Q</footer>
       <aside id="portrait-guidance" class="portrait-guidance">
         <strong>Rotate your phone for the best camp chaos.</strong>
         <span>Portrait play still works if you need it.</span>

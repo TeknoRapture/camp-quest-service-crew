@@ -6,7 +6,7 @@ This initial playable foundation includes a canvas-rendered Main Camp, touch and
 
 ## Play
 
-- **Phone:** use the on-screen D-pad and large **ACTION** button.
+- **Phone:** use the on-screen D-pad by default, or tap **Controls: D-pad** to switch to the optional joystick; use the large **ACTION** button to interact.
 - **Desktop:** move with WASD or arrow keys; interact with Space or E.
 - Talk to Coop by the Welcome Center, recover supplies, deliver the crate to the Dining Hall, and walk into the Shower House doorway to explore the proof-of-concept interior.
 - Open the Service Checklist to expand or collapse quest categories and questlines. Tap an active quest or objective row to track it; tap the tracked quest again to return to the default main-objective priority.
