@@ -256,7 +256,7 @@ function renderChecklist() {
           if (isObjectiveComplete(quest.id, objective.id)) classes.push('done');
           else if (!isObjectiveUnlocked(quest.id, objective)) classes.push('locked');
           const trackable = isQuestTrackable(quest);
-          rows.push(`<li class="${classes.join(' ')}${trackable ? ' trackable' : ''}" data-action="track-quest" data-quest-id="${escapeHtml(quest.id)}" role="${trackable ? 'button' : 'listitem'}" ${trackable ? 'tabindex="0"' : ''}>${escapeHtml(objective.label)}</li>`);
+          rows.push(`<li class="${classes.join(' ')}${trackable ? ' trackable' : ''}" data-action="track-quest" data-quest-id="${escapeHtml(quest.id)}" role="${trackable ? 'button' : 'listitem'}" ${trackable ? 'tabindex="0"' : ''}><span>${escapeHtml(objective.label)}</span></li>`);
         }
       }
     }
