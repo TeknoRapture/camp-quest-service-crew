@@ -1,5 +1,5 @@
 import { getNpcQuestState, isObjectiveComplete, isObjectiveUnlocked, isQuestCompleted } from './questEngine';
-import type { DialogueCondition, DialogueEffect, DialogueTopic, DialogueTopicId, ItemDefinition, MapDefinition, NPCDefinition, QuestDefinition, QuestRuntimeState } from './content/types';
+import type { DialogueCondition, DialogueTopic, DialogueTopicId, ItemDefinition, MapDefinition, NPCDefinition, QuestDefinition, QuestRuntimeState } from './content/types';
 
 export interface DialogueRuntimeState { flags: Record<string, boolean | string | number>; seenTopicIds: Set<DialogueTopicId>; }
 
@@ -56,10 +56,23 @@ export function getValidDialogueTopics(topics: readonly DialogueTopic[], context
 
 export function meaningfulDialogueTopics(topics: readonly DialogueTopic[]) { return topics.filter(topic => !topic.isDefault); }
 
+export function topLevelDialogueTopics(topics: readonly DialogueTopic[]) {
+  const followUpTopicIds = new Set(topics.flatMap(topic => topic.nextTopicIds ?? []));
+  return topics.filter(topic => !followUpTopicIds.has(topic.id));
+}
+
+export function getValidNextDialogueTopics(topics: readonly DialogueTopic[], topic: DialogueTopic, context: DialogueContext) {
+  const nextTopicIds = topic.nextTopicIds ?? [];
+  if (!nextTopicIds.length) return [];
+  const validTopics = getValidDialogueTopics(topics, context);
+  return nextTopicIds
+    .map(topicId => validTopics.find(candidate => candidate.id === topicId))
+    .filter((candidate): candidate is DialogueTopic => Boolean(candidate));
+}
+
 export function validateDialogueTopics(topics: readonly DialogueTopic[], context: { npcs?: readonly NPCDefinition[]; quests?: readonly QuestDefinition[]; items?: readonly ItemDefinition[]; maps?: Record<string, MapDefinition> | readonly MapDefinition[] } = {}) {
   const issues: DialogueValidationIssue[] = [];
   const topicIds = new Set<string>();
-  const allTopicIds = new Set(topics.map(topic => topic.id));
   const npcIds = new Set((context.npcs ?? []).map(npc => npc.id));
   const dialogueGroups = new Set((context.npcs ?? []).map(npc => npc.dialogueId));
   const questById = new Map((context.quests ?? []).map(quest => [quest.id, quest]));
@@ -85,7 +98,16 @@ export function validateDialogueTopics(topics: readonly DialogueTopic[], context
     if (!topic.label.trim()) issues.push({ level: 'error', message: 'Dialogue topic has an empty label.', topicId: topic.id });
     if (!topic.response.trim()) issues.push({ level: 'error', message: 'Dialogue topic has an empty response.', topicId: topic.id });
     if (topic.once && topic.repeatable) issues.push({ level: 'warning', message: 'Dialogue topic is both once and repeatable; once will win.', topicId: topic.id });
-    for (const nextTopicId of topic.nextTopicIds ?? []) if (!allTopicIds.has(nextTopicId)) issues.push({ level: 'error', message: `Dialogue topic references missing nextTopicId "${nextTopicId}".`, topicId: topic.id, targetId: nextTopicId });
+    for (const nextTopicId of topic.nextTopicIds ?? []) {
+      const nextTopic = topics.find(candidate => candidate.id === nextTopicId);
+      if (!nextTopic) {
+        issues.push({ level: 'error', message: `Dialogue topic references missing nextTopicId "${nextTopicId}".`, topicId: topic.id, targetId: nextTopicId });
+      } else if (topic.npcId && nextTopic.npcId && topic.npcId !== nextTopic.npcId) {
+        issues.push({ level: 'warning', message: `Dialogue nextTopicId "${nextTopicId}" points to a different NPC.`, topicId: topic.id, targetId: nextTopicId });
+      } else if (topic.groupId && nextTopic.groupId && topic.groupId !== nextTopic.groupId) {
+        issues.push({ level: 'warning', message: `Dialogue nextTopicId "${nextTopicId}" points to a different dialogue group.`, topicId: topic.id, targetId: nextTopicId });
+      }
+    }
 
     for (const condition of topic.conditions ?? []) {
       switch (condition.type) {

@@ -2,7 +2,7 @@ import './style.css';
 import { AssetLoader, type AssetId, type AssetProgress } from './assets';
 import { drawSprite } from './sprites';
 import { dialogue, dialogueTopics } from './content/dialogue';
-import { getValidDialogueTopics, meaningfulDialogueTopics, validateDialogueTopics } from './dialogueEngine';
+import { getValidDialogueTopics, getValidNextDialogueTopics, meaningfulDialogueTopics, topLevelDialogueTopics, validateDialogueTopics, type DialogueContext } from './dialogueEngine';
 import { maps, mainCamp } from './content/maps';
 import { chooseLoadingTip } from './content/loadingTips';
 import { blockedBridge } from './content/locations';
@@ -130,7 +130,7 @@ function updateCamera() {
 const keys = new Set<string>();
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
-type DialogueUiState = { mode: 'closed' } | { mode: 'choosingTopic'; speaker: DialogueSpeaker; topics: DialogueTopic[]; selectedIndex: number } | { mode: 'showingResponse'; speaker: DialogueSpeaker; topicId?: string; response: string };
+type DialogueUiState = { mode: 'closed' } | { mode: 'choosingTopic'; speaker: DialogueSpeaker; topics: DialogueTopic[]; selectedIndex: number } | { mode: 'showingResponse'; speaker: DialogueSpeaker; topicId?: string; response: string; followUpTopics?: DialogueTopic[]; selectedIndex?: number };
 let dialogueUiState: DialogueUiState = { mode: 'closed' };
 const collapsedChecklistRows = new Set<string>();
 const state = {
@@ -345,9 +345,24 @@ function setDialogueSpeaker(speaker: DialogueSpeaker) {
   ui.portrait.onerror = () => { ui.dialogue.classList.add('portrait-missing'); ui.portraitPanel.classList.add('hidden'); ui.portrait.removeAttribute('src'); };
   ui.portrait.src = speaker.portraits?.default ?? genericNpcPortrait; ui.dialogue.classList.remove('hidden');
 }
-function showDialogue(speaker: DialogueSpeaker, text: string, topicId?: string) {
-  setDialogueSpeaker(speaker); dialogueUiState = { mode: 'showingResponse', speaker, topicId, response: text };
-  ui.text.textContent = text; ui.choices.replaceChildren(); ui.hint.textContent = 'Tap ACTION to continue';
+function renderDialogueTopicButtons(topics: DialogueTopic[], onSelect: (topic: DialogueTopic) => void) {
+  ui.choices.replaceChildren(...topics.map((topic, index) => {
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = topic.label; button.dataset.topicId = topic.id;
+    button.addEventListener('click', () => onSelect(topic));
+    if (index === 0) button.classList.add('selected');
+    return button;
+  }));
+  if (topics.length) focusDialogueChoice(0);
+}
+function showDialogue(speaker: DialogueSpeaker, text: string, topicId?: string, followUpTopics: DialogueTopic[] = []) {
+  setDialogueSpeaker(speaker); dialogueUiState = { mode: 'showingResponse', speaker, topicId, response: text, followUpTopics, selectedIndex: 0 };
+  ui.text.textContent = text;
+  if (followUpTopics.length) {
+    renderDialogueTopicButtons(followUpTopics, topic => runDialogueTopic(speaker, topic, false));
+    ui.hint.textContent = 'Choose a follow-up · Escape closes';
+  } else {
+    ui.choices.replaceChildren(); ui.hint.textContent = 'Tap ACTION to continue';
+  }
 }
 function closeDialogue() { dialogueOpen = false; dialogueUiState = { mode: 'closed' }; ui.choices.replaceChildren(); ui.dialogue.classList.add('hidden'); }
 function focusDialogueChoice(index: number) {
@@ -357,24 +372,21 @@ function focusDialogueChoice(index: number) {
 function showTopicChoices(speaker: DialogueSpeaker, topics: DialogueTopic[]) {
   setDialogueSpeaker(speaker); dialogueUiState = { mode: 'choosingTopic', speaker, topics, selectedIndex: 0 };
   ui.text.textContent = 'What do you want to ask?'; ui.hint.textContent = 'Choose a topic · Escape closes';
-  ui.choices.replaceChildren(...topics.map((topic, index) => {
-    const button = document.createElement('button'); button.type = 'button'; button.textContent = topic.label; button.dataset.topicId = topic.id;
-    button.addEventListener('click', () => runDialogueTopic(speaker, topic));
-    if (index === 0) button.classList.add('selected');
-    return button;
-  }));
-  focusDialogueChoice(0);
+  renderDialogueTopicButtons(topics, topic => runDialogueTopic(speaker, topic));
 }
 function updateTopicSelection(delta: 1 | -1) {
-  if (dialogueUiState.mode !== 'choosingTopic') return false;
-  const nextIndex = (dialogueUiState.selectedIndex + delta + dialogueUiState.topics.length) % dialogueUiState.topics.length;
+  if (dialogueUiState.mode !== 'choosingTopic' && !(dialogueUiState.mode === 'showingResponse' && dialogueUiState.followUpTopics?.length)) return false;
+  const topics = dialogueUiState.mode === 'choosingTopic' ? dialogueUiState.topics : dialogueUiState.followUpTopics ?? [];
+  const selectedIndex = dialogueUiState.selectedIndex ?? 0;
+  const nextIndex = (selectedIndex + delta + topics.length) % topics.length;
   dialogueUiState.selectedIndex = nextIndex;
   Array.from(ui.choices.querySelectorAll<HTMLButtonElement>('button')).forEach((button, index) => button.classList.toggle('selected', index === nextIndex));
   focusDialogueChoice(nextIndex); return true;
 }
 function selectHighlightedTopic() {
-  if (dialogueUiState.mode !== 'choosingTopic') return false;
-  runDialogueTopic(dialogueUiState.speaker, dialogueUiState.topics[dialogueUiState.selectedIndex]); return true;
+  if (dialogueUiState.mode === 'choosingTopic') { runDialogueTopic(dialogueUiState.speaker, dialogueUiState.topics[dialogueUiState.selectedIndex]); return true; }
+  if (dialogueUiState.mode === 'showingResponse' && dialogueUiState.followUpTopics?.length) { runDialogueTopic(dialogueUiState.speaker, dialogueUiState.followUpTopics[dialogueUiState.selectedIndex ?? 0], false); return true; }
+  return false;
 }
 function applyDialogueEffect(effect: DialogueEffect) {
   if (effect.type === 'emitQuestEvent') return processQuestEvent(effect.event);
@@ -387,15 +399,20 @@ function applyDialogueEffect(effect: DialogueEffect) {
   if (effect.type === 'setQuestFlag') { state.quests.flags[effect.flag] = effect.value ?? true; return processQuestEvent({ type: 'questFlagSet', flag: effect.flag }); }
   if (effect.type === 'showToast') { toast(effect.text); return; }
 }
-function runDialogueTopic(speaker: DialogueSpeaker, topic: DialogueTopic) {
+function dialogueContext(npc: NPCDefinition): DialogueContext {
+  return { npc, mapId: currentMap.id, npcs: allNpcs, quests, questState: state.quests, dialogueState: state.dialogue, heldItemCount: itemCount };
+}
+function runDialogueTopic(speaker: DialogueSpeaker, topic: DialogueTopic, allowFollowUps = true) {
   for (const effect of topic.effects ?? []) applyDialogueEffect(effect);
   state.dialogue.seenTopicIds.add(topic.id);
-  showDialogue(speaker, topic.response, topic.id); refreshUI();
+  const npc = 'id' in speaker ? allNpcs.find(candidate => candidate.id === speaker.id) : undefined;
+  const followUpTopics = allowFollowUps && npc ? getValidNextDialogueTopics(dialogueTopics, topic, dialogueContext(npc)) : [];
+  showDialogue(speaker, topic.response, topic.id, followUpTopics); refreshUI();
 }
 function startNpcDialogue(npc: NPCDefinition) {
-  const topics = getValidDialogueTopics(dialogueTopics, { npc, mapId: currentMap.id, npcs: allNpcs, quests, questState: state.quests, dialogueState: state.dialogue, heldItemCount: itemCount });
-  const meaningfulTopics = meaningfulDialogueTopics(topics);
-  if (meaningfulTopics.length > 1) { showTopicChoices(npc, meaningfulTopics); return; }
+  const topics = getValidDialogueTopics(dialogueTopics, dialogueContext(npc));
+  const meaningfulTopics = meaningfulDialogueTopics(topLevelDialogueTopics(topics));
+  if (meaningfulTopics.length > 1 || meaningfulTopics.some(topic => topic.nextTopicIds?.length)) { showTopicChoices(npc, meaningfulTopics); return; }
   if (meaningfulTopics.length === 1) { runDialogueTopic(npc, meaningfulTopics[0]); return; }
   const defaultTopic = topics.find(topic => topic.isDefault);
   if (defaultTopic) { runDialogueTopic(npc, defaultTopic); return; }
@@ -681,7 +698,7 @@ let last = performance.now(); function loop(now: number) { const dt = Math.min((
 const keyMap: Record<string, string> = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
 addEventListener('keydown', event => {
   if (gamePhase !== 'playing') { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); startGame(); } return; }
-  if (dialogueUiState.mode === 'choosingTopic') {
+  if (dialogueUiState.mode === 'choosingTopic' || (dialogueUiState.mode === 'showingResponse' && dialogueUiState.followUpTopics?.length)) {
     if (['ArrowUp', 'w', 'W'].includes(event.key)) { updateTopicSelection(-1); event.preventDefault(); return; }
     if (['ArrowDown', 's', 'S'].includes(event.key)) { updateTopicSelection(1); event.preventDefault(); return; }
     if (['Enter', ' ', 'e', 'E'].includes(event.key)) { selectHighlightedTopic(); event.preventDefault(); return; }

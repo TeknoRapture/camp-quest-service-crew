@@ -44,6 +44,36 @@ export const dialogueTopics: DialogueTopic[] = [
     response: 'That sign? It has been warning campers longer than the lost-and-found bin has been collecting single socks. If you saw the symbol, stay cheerful... and stay on the Main Camp side of the bridge for now.',
     effects: [{ type: 'setDialogueFlag', flag: 'coopDiscussedCliffSign', value: true }],
   },
+
+  {
+    id: 'rangerEoj.woods',
+    npcId: 'crazyjoe',
+    label: 'Ask about the woods',
+    priority: 500,
+    response: 'The woods are a good teacher if you pay attention, respect the boundaries, and do not wander where campers should not go. Also: if a trail looks mysterious before breakfast, that is usually mud wearing a disguise.',
+    nextTopicIds: ['rangerEoj.woods.watchOut', 'rangerEoj.woods.back40', 'rangerEoj.woods.neverMind'],
+  },
+  {
+    id: 'rangerEoj.woods.watchOut',
+    npcId: 'crazyjoe',
+    label: 'What should I watch out for?',
+    priority: 490,
+    response: 'Mud with ambition, critters with opinions, and any vulture acting like it has clipboard authority. Stay alert, stay kind, and stay on marked paths.',
+  },
+  {
+    id: 'rangerEoj.woods.back40',
+    npcId: 'crazyjoe',
+    label: 'What is Back 40?',
+    priority: 480,
+    response: 'Back 40 is Outdoor Challenge territory: bigger trails, bigger teamwork, and absolutely not a place to wander into without permission. Day 1 Service Crew can wave at it from this side of the bridge.',
+  },
+  {
+    id: 'rangerEoj.woods.neverMind',
+    npcId: 'crazyjoe',
+    label: 'Never mind.',
+    priority: 470,
+    response: 'Fair enough. The woods will still be there after the checklist stops looking like a raccoon edited it.',
+  },
   {
     id: 'coop.default',
     npcId: 'coop',
