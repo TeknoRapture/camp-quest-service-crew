@@ -516,8 +516,8 @@ function update(dt: number) {
   transitionCooldown = Math.max(0, transitionCooldown - dt); blockedSkillMessageCooldown = Math.max(0, blockedSkillMessageCooldown - dt);
   if (actionQueued) { actionQueued = false; interact(); }
   if (dialogueOpen || inspectionOpen || ui.checklist.classList.contains('open')) { input.resetJoystick(); return; }
-  const { x, y } = input.getMovementVector(); const len = Math.hypot(x, y) || 1;
-  const hazard = currentMap.hazards.find(item => intersects(player, item)); const speed = player.speed * (hazard && hazard.kind !== 'mosquitoes' ? .55 : 1); move(x / len * speed * dt, y / len * speed * dt);
+  const { x, y, magnitude } = input.getMovementVector(); const len = Math.hypot(x, y) || 1;
+  const hazard = currentMap.hazards.find(item => intersects(player, item)); const speed = player.speed * magnitude * (hazard && hazard.kind !== 'mosquitoes' ? .55 : 1); move(x / len * speed * dt, y / len * speed * dt);
   if (tryAutomaticExit()) return;
   const bridgeTeaser = currentMap.interactables.find(({ id }) => id === 'back40TeaserMessage');
   if (bridgeTeaser && intersects(player, bridgeTeaser)) completeBridgeObjective();

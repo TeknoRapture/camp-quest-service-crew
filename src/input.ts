@@ -1,6 +1,7 @@
 export type Direction = 'up' | 'down' | 'left' | 'right';
 export type MobileControlMode = 'dpad' | 'joystick';
-export type MovementVector = { x: number; y: number };
+export type MovementSource = 'digital' | 'joystick' | 'none';
+export type MovementVector = { x: number; y: number; magnitude: number; source: MovementSource };
 
 type DialogueKeyboardState =
   | { mode: 'closed' }
@@ -77,7 +78,7 @@ export function createInputController(options: InputControllerOptions): InputCon
   const directionButtons = Array.from(elements.directionButtons);
   const keys = new Set<Direction>();
   let mobileControlMode: MobileControlMode = 'joystick';
-  const joystickInput = { pointerId: null as number | null, active: false, centerX: 0, centerY: 0, vectorX: 0, vectorY: 0 };
+  const joystickInput = { pointerId: null as number | null, active: false, centerX: 0, centerY: 0, vectorX: 0, vectorY: 0, magnitude: 0 };
 
   function resetJoystick() {
     joystickInput.pointerId = null;
@@ -86,6 +87,7 @@ export function createInputController(options: InputControllerOptions): InputCon
     joystickInput.centerY = 0;
     joystickInput.vectorX = 0;
     joystickInput.vectorY = 0;
+    joystickInput.magnitude = 0;
     elements.joystickBase.style.setProperty('--base-x', '0px');
     elements.joystickBase.style.setProperty('--base-y', '0px');
     elements.joystickKnob.style.setProperty('--knob-x', '0px');
@@ -113,7 +115,9 @@ export function createInputController(options: InputControllerOptions): InputCon
     const digitalX = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0);
     const digitalY = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0);
     const usingDigital = digitalX !== 0 || digitalY !== 0;
-    return { x: usingDigital ? digitalX : joystickInput.vectorX, y: usingDigital ? digitalY : joystickInput.vectorY };
+    if (usingDigital) return { x: digitalX, y: digitalY, magnitude: 1, source: 'digital' };
+    if (joystickInput.magnitude > 0) return { x: joystickInput.vectorX, y: joystickInput.vectorY, magnitude: joystickInput.magnitude, source: 'joystick' };
+    return { x: 0, y: 0, magnitude: 0, source: 'none' };
   }
 
   function updateJoystickFromPointer(event: PointerEvent) {
@@ -127,9 +131,10 @@ export function createInputController(options: InputControllerOptions): InputCon
     const knobX = distance ? dx / distance * clampedDistance : 0, knobY = distance ? dy / distance * clampedDistance : 0;
     elements.joystickKnob.style.setProperty('--knob-x', `${knobX}px`);
     elements.joystickKnob.style.setProperty('--knob-y', `${knobY}px`);
-    if (distance < deadZone) { joystickInput.vectorX = 0; joystickInput.vectorY = 0; return; }
+    if (distance < deadZone) { joystickInput.vectorX = 0; joystickInput.vectorY = 0; joystickInput.magnitude = 0; return; }
     joystickInput.vectorX = distance ? dx / distance : 0;
     joystickInput.vectorY = distance ? dy / distance : 0;
+    joystickInput.magnitude = (clampedDistance - deadZone) / (radius - deadZone);
   }
 
   function startJoystick(event: PointerEvent) {
