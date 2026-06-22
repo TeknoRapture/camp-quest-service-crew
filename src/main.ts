@@ -132,7 +132,7 @@ function updateCamera() {
 const keys = new Set<string>();
 type MobileControlMode = 'dpad' | 'joystick';
 const CONTROL_MODE_STORAGE_KEY = 'campQuestControlMode';
-let mobileControlMode: MobileControlMode = 'dpad';
+let mobileControlMode: MobileControlMode = 'joystick';
 const joystickInput = { pointerId: null as number | null, active: false, centerX: 0, centerY: 0, vectorX: 0, vectorY: 0 };
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
@@ -438,7 +438,7 @@ function dist(a: Rect, b: Rect) { return Math.hypot(a.x + a.w / 2 - b.x - b.w / 
 function intersects(a: Rect, b: Rect) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
 function safeStorageGet(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 function safeStorageSet(key: string, value: string) { try { localStorage.setItem(key, value); } catch { /* Ignore storage failures; controls keep their in-memory fallback. */ } }
-function validControlMode(value: string | null): MobileControlMode { return value === 'joystick' ? 'joystick' : 'dpad'; }
+function validControlMode(value: string | null): MobileControlMode { return value === 'dpad' ? 'dpad' : 'joystick'; }
 function award(points: number) { player.points += points; safeStorageSet('campQuestBest', String(Math.max(player.points, Number(safeStorageGet('campQuestBest') || 0)))); }
 function switchMap(exit: InteractableDefinition) {
   const nextMap = exit.targetMapId ? maps[exit.targetMapId] : undefined;
