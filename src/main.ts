@@ -5,6 +5,7 @@ import { dialogue, dialogueTopics } from './content/dialogue';
 import { getValidDialogueTopics, getValidNextDialogueTopics, meaningfulDialogueTopics, topLevelDialogueTopics, validateDialogueTopics, type DialogueContext } from './dialogueEngine';
 import { maps, mainCamp } from './content/maps';
 import { chooseLoadingTip } from './content/loadingTips';
+import { createInputController, type InputController } from './input';
 import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
@@ -129,11 +130,7 @@ function updateCamera() {
   camera.x = clampCameraAxis(currentMap.size.w, viewport.w, player.x + player.w / 2 - viewport.w / 2);
   camera.y = clampCameraAxis(currentMap.size.h, viewport.h, player.y + player.h / 2 - viewport.h / 2);
 }
-const keys = new Set<string>();
-type MobileControlMode = 'dpad' | 'joystick';
-const CONTROL_MODE_STORAGE_KEY = 'campQuestControlMode';
-let mobileControlMode: MobileControlMode = 'joystick';
-const joystickInput = { pointerId: null as number | null, active: false, centerX: 0, centerY: 0, vectorX: 0, vectorY: 0 };
+let input: InputController;
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 type DialogueUiState = { mode: 'closed' } | { mode: 'choosingTopic'; speaker: DialogueSpeaker; topics: DialogueTopic[]; selectedIndex: number } | { mode: 'showingResponse'; speaker: DialogueSpeaker; topicId?: string; response: string; followUpTopics?: DialogueTopic[]; selectedIndex?: number };
@@ -426,7 +423,7 @@ function startNpcDialogue(npc: NPCDefinition) {
   showDialogue(npc, resolveNpcDialogue(npc, result)); refreshUI();
 }
 function inspectImage(title: string, assetId: AssetId, caption: string) {
-  inspectionOpen = true; keys.clear(); ui.inspectionTitle.textContent = title; ui.inspectionCaption.textContent = caption;
+  inspectionOpen = true; input.clearMovementInput(); ui.inspectionTitle.textContent = title; ui.inspectionCaption.textContent = caption;
   ui.inspectionImage.classList.remove('hidden'); ui.inspectionFallback.classList.add('hidden'); ui.inspectionImage.alt = title;
   ui.inspectionFallback.textContent = `${title} image unavailable`;
   ui.inspectionImage.onerror = () => { ui.inspectionImage.classList.add('hidden'); ui.inspectionFallback.classList.remove('hidden'); };
@@ -438,13 +435,12 @@ function dist(a: Rect, b: Rect) { return Math.hypot(a.x + a.w / 2 - b.x - b.w / 
 function intersects(a: Rect, b: Rect) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
 function safeStorageGet(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 function safeStorageSet(key: string, value: string) { try { localStorage.setItem(key, value); } catch { /* Ignore storage failures; controls keep their in-memory fallback. */ } }
-function validControlMode(value: string | null): MobileControlMode { return value === 'dpad' ? 'dpad' : 'joystick'; }
 function award(points: number) { player.points += points; safeStorageSet('campQuestBest', String(Math.max(player.points, Number(safeStorageGet('campQuestBest') || 0)))); }
 function switchMap(exit: InteractableDefinition) {
   const nextMap = exit.targetMapId ? maps[exit.targetMapId] : undefined;
   const spawn = nextMap?.spawns.find(({ id }) => id === exit.targetSpawnId);
   if (!nextMap || !spawn) { toast('That route is not ready yet.'); return; }
-  currentMap = nextMap; player.x = spawn.x; player.y = spawn.y; keys.clear(); transitionCooldown = .45;
+  currentMap = nextMap; player.x = spawn.x; player.y = spawn.y; input.clearMovementInput(); transitionCooldown = .45;
   processQuestEvent({ type: 'mapEntered', mapId: currentMap.id, spawnId: spawn.id });
   scheduleLayoutRecalculation(); toast(`Entered ${currentMap.displayName}`); refreshUI();
 }
@@ -499,19 +495,6 @@ function interact() {
   toast('Nothing useful nearby. Service Crew Rule #2: check the weirdest place first.');
 }
 function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionOpen || ui.checklist.classList.contains('open'); }
-function resetJoystick() {
-  joystickInput.pointerId = null; joystickInput.active = false; joystickInput.centerX = 0; joystickInput.centerY = 0; joystickInput.vectorX = 0; joystickInput.vectorY = 0;
-  ui.joystickBase.style.setProperty('--base-x', '0px'); ui.joystickBase.style.setProperty('--base-y', '0px');
-  ui.joystickKnob.style.setProperty('--knob-x', '0px'); ui.joystickKnob.style.setProperty('--knob-y', '0px');
-}
-function applyControlMode(mode: MobileControlMode, save = false) {
-  mobileControlMode = mode; resetJoystick();
-  const shell = document.querySelector('#game-shell')!;
-  shell.classList.toggle('control-mode-dpad', mode === 'dpad'); shell.classList.toggle('control-mode-joystick', mode === 'joystick');
-  ui.controlModeToggle.textContent = `Controls: ${mode === 'dpad' ? 'D-pad' : 'Joystick'}`;
-  ui.controlModeToggle.setAttribute('aria-label', `Current movement controls: ${mode === 'dpad' ? 'D-pad' : 'Joystick'}. Tap to switch.`);
-  if (save) safeStorageSet(CONTROL_MODE_STORAGE_KEY, mode); scheduleLayoutRecalculation();
-}
 function dropLastLargeItem() {
   const id = state.largePickupOrder.at(-1); if (!id) { toast('No bulky supply to set down.'); return; }
   const item = itemById(id); if (!item) return;
@@ -532,9 +515,8 @@ function update(dt: number) {
   if (gamePhase !== 'playing') return;
   transitionCooldown = Math.max(0, transitionCooldown - dt); blockedSkillMessageCooldown = Math.max(0, blockedSkillMessageCooldown - dt);
   if (actionQueued) { actionQueued = false; interact(); }
-  if (dialogueOpen || inspectionOpen || ui.checklist.classList.contains('open')) { resetJoystick(); return; }
-  const digitalX = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0), digitalY = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0);
-  const usingDigital = digitalX !== 0 || digitalY !== 0; const x = usingDigital ? digitalX : joystickInput.vectorX, y = usingDigital ? digitalY : joystickInput.vectorY; const len = Math.hypot(x, y) || 1;
+  if (dialogueOpen || inspectionOpen || ui.checklist.classList.contains('open')) { input.resetJoystick(); return; }
+  const { x, y } = input.getMovementVector(); const len = Math.hypot(x, y) || 1;
   const hazard = currentMap.hazards.find(item => intersects(player, item)); const speed = player.speed * (hazard && hazard.kind !== 'mosquitoes' ? .55 : 1); move(x / len * speed * dt, y / len * speed * dt);
   if (tryAutomaticExit()) return;
   const bridgeTeaser = currentMap.interactables.find(({ id }) => id === 'back40TeaserMessage');
@@ -713,84 +695,43 @@ function updateFullscreenButtonState() {
 function startGame() {
   if (gamePhase !== 'ready') return;
   requestGameFullscreen();
-  gamePhase = 'playing'; keys.clear(); actionQueued = false;
+  gamePhase = 'playing'; input.clearMovementInput(); actionQueued = false;
   document.querySelector('#game-shell')!.classList.remove('title-phase');
   showDialogue(mainCamp.npcs[0], dialogue.opening[0]); refreshUI(); scheduleLayoutRecalculation();
 }
 
 let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (gamePhase === 'playing' && toastTimer > 0 && (toastTimer -= dt) <= 0) ui.toast.classList.add('hidden'); draw(); requestAnimationFrame(loop); }
-const keyMap: Record<string, string> = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
-addEventListener('keydown', event => {
-  if (gamePhase !== 'playing') { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); startGame(); } return; }
-  if (dialogueUiState.mode === 'choosingTopic' || (dialogueUiState.mode === 'showingResponse' && dialogueUiState.followUpTopics?.length)) {
-    if (['ArrowUp', 'w', 'W'].includes(event.key)) { updateTopicSelection(-1); event.preventDefault(); return; }
-    if (['ArrowDown', 's', 'S'].includes(event.key)) { updateTopicSelection(1); event.preventDefault(); return; }
-    if (['Enter', ' ', 'e', 'E'].includes(event.key)) { selectHighlightedTopic(); event.preventDefault(); return; }
-  }
-  if (dialogueOpen && ['Enter', ' ', 'e', 'E'].includes(event.key)) { closeDialogue(); event.preventDefault(); return; }
-  if (keyMap[event.key]) { keys.add(keyMap[event.key]); event.preventDefault(); }
-  if (['q', 'Q'].includes(event.key)) { dropLastLargeItem(); event.preventDefault(); }
-  if ([' ', 'e', 'E'].includes(event.key)) { actionQueued = true; event.preventDefault(); }
-  if (event.key === 'Escape') { closeDialogue(); closeInspection(); }
-});
-addEventListener('keyup', event => { if (keyMap[event.key]) keys.delete(keyMap[event.key]); });
-canvas.addEventListener('pointerdown', event => { if (gamePhase !== 'playing') { event.preventDefault(); startGame(); } });
 const directionButtons = document.querySelectorAll<HTMLButtonElement>('[data-dir]');
 const actionButton = document.querySelector<HTMLButtonElement>('#action-button')!;
 const preventControlDefault = (event: Event) => event.preventDefault();
-function updateJoystickFromPointer(event: PointerEvent) {
-  if (mobileControlMode !== 'joystick' || !joystickInput.active || event.pointerId !== joystickInput.pointerId) return;
-  event.preventDefault();
-  if (controlsBlocked()) { resetJoystick(); return; }
-  const radius = Math.max(42, Math.min(ui.joystick.clientWidth, ui.joystick.clientHeight) * .38);
-  const deadZone = radius * .22;
-  const dx = event.clientX - joystickInput.centerX, dy = event.clientY - joystickInput.centerY;
-  const distance = Math.hypot(dx, dy), clampedDistance = Math.min(radius, distance);
-  const knobX = distance ? dx / distance * clampedDistance : 0, knobY = distance ? dy / distance * clampedDistance : 0;
-  ui.joystickKnob.style.setProperty('--knob-x', `${knobX}px`); ui.joystickKnob.style.setProperty('--knob-y', `${knobY}px`);
-  if (distance < deadZone) { joystickInput.vectorX = 0; joystickInput.vectorY = 0; return; }
-  joystickInput.vectorX = distance ? dx / distance : 0; joystickInput.vectorY = distance ? dy / distance : 0;
-}
-function startJoystick(event: PointerEvent) {
-  event.preventDefault();
-  if (mobileControlMode !== 'joystick' || controlsBlocked() || joystickInput.pointerId !== null) return;
-  joystickInput.pointerId = event.pointerId; joystickInput.active = true;
-  const rect = ui.joystick.getBoundingClientRect();
-  joystickInput.centerX = event.clientX; joystickInput.centerY = event.clientY;
-  const defaultCenterX = rect.left + rect.width / 2, defaultCenterY = rect.top + rect.height / 2;
-  if (Math.hypot(event.clientX - defaultCenterX, event.clientY - defaultCenterY) < Math.min(rect.width, rect.height) * .36) { joystickInput.centerX = defaultCenterX; joystickInput.centerY = defaultCenterY; }
-  ui.joystickBase.style.setProperty('--base-x', `${joystickInput.centerX - defaultCenterX}px`); ui.joystickBase.style.setProperty('--base-y', `${joystickInput.centerY - defaultCenterY}px`);
-  try { ui.joystick.setPointerCapture(event.pointerId); } catch { /* Pointer capture is best-effort. */ }
-  updateJoystickFromPointer(event);
-}
-function stopJoystick(event?: PointerEvent) {
-  if (event) { event.preventDefault(); if (joystickInput.pointerId !== null && event.pointerId !== joystickInput.pointerId) return; }
-  resetJoystick();
-}
-directionButtons.forEach(button => {
-  const dir = button.dataset.dir!;
-  const on = (event: PointerEvent) => { event.preventDefault(); if (gamePhase !== 'playing') return; keys.add(dir); button.classList.add('pressed'); };
-  const off = (event: PointerEvent) => { event.preventDefault(); keys.delete(dir); button.classList.remove('pressed'); };
-  button.addEventListener('pointerdown', on);
-  button.addEventListener('pointerup', off);
-  button.addEventListener('pointercancel', off);
-  button.addEventListener('pointerleave', off);
-  button.addEventListener('contextmenu', preventControlDefault);
+input = createInputController({
+  elements: {
+    canvas,
+    shell: document.querySelector('#game-shell')!,
+    directionButtons,
+    actionButton,
+    dropButton: ui.dropButton,
+    controlModeToggle: ui.controlModeToggle,
+    joystick: ui.joystick,
+    joystickBase: ui.joystickBase,
+    joystickKnob: ui.joystickKnob,
+  },
+  isPlaying: () => gamePhase === 'playing',
+  controlsBlocked,
+  onStartGame: startGame,
+  onAction: () => { actionQueued = true; },
+  onDrop: dropLastLargeItem,
+  onEscape: () => { closeDialogue(); closeInspection(); },
+  getDialogueKeyboardState: () => {
+    if (dialogueUiState.mode === 'choosingTopic') return { mode: 'choosingTopic' };
+    if (dialogueUiState.mode === 'showingResponse') return { mode: 'showingResponse', hasFollowUpTopics: Boolean(dialogueUiState.followUpTopics?.length) };
+    return { mode: 'closed' };
+  },
+  onDialogueSelectionDelta: updateTopicSelection,
+  onDialogueSelect: selectHighlightedTopic,
+  onDialogueClose: closeDialogue,
+  onLayoutMayNeedUpdate: scheduleLayoutRecalculation,
 });
-ui.joystick.addEventListener('pointerdown', startJoystick);
-ui.joystick.addEventListener('pointermove', updateJoystickFromPointer);
-ui.joystick.addEventListener('pointerup', stopJoystick);
-ui.joystick.addEventListener('pointercancel', stopJoystick);
-ui.joystick.addEventListener('lostpointercapture', stopJoystick);
-ui.joystick.addEventListener('contextmenu', preventControlDefault);
-ui.controlModeToggle.addEventListener('click', () => applyControlMode(mobileControlMode === 'dpad' ? 'joystick' : 'dpad', true));
-ui.controlModeToggle.addEventListener('contextmenu', preventControlDefault);
-ui.dropButton.addEventListener('pointerdown', event => { event.preventDefault(); if (gamePhase === 'playing') dropLastLargeItem(); });
-actionButton.addEventListener('pointerdown', event => { event.preventDefault(); if (gamePhase === 'playing') actionQueued = true; });
-actionButton.addEventListener('pointerup', preventControlDefault);
-actionButton.addEventListener('pointercancel', preventControlDefault);
-actionButton.addEventListener('pointerleave', preventControlDefault);
-actionButton.addEventListener('contextmenu', preventControlDefault);
 ui.fullscreenButton.addEventListener('click', () => requestGameFullscreen(true));
 document.addEventListener('fullscreenchange', updateFullscreenButtonState);
 document.querySelector('#close-inspection')!.addEventListener('click', closeInspection); ui.inspection.addEventListener('click', event => { if (event.target === ui.inspection) closeInspection(); });
@@ -799,7 +740,7 @@ const setChecklistOpen = (open: boolean) => {
   ui.checklist.classList.toggle('open', open);
   ui.checklist.setAttribute('aria-hidden', String(!open));
   checklistButton.setAttribute('aria-expanded', String(open));
-  resetJoystick();
+  input.resetJoystick();
   requestAnimationFrame(updateChecklistScrollButtons);
 };
 const scrollChecklist = (direction: 1 | -1) => ui.tasks.scrollBy({ top: direction * 120, behavior: 'smooth' });
@@ -829,11 +770,7 @@ ui.checklistScrollUp.addEventListener('contextmenu', preventControlDefault);
 ui.checklistScrollDown.addEventListener('contextmenu', preventControlDefault);
 checklistButton.addEventListener('click', () => { if (gamePhase === 'playing') setChecklistOpen(!ui.checklist.classList.contains('open')); });
 document.querySelector('#close-checklist')!.addEventListener('click', () => setChecklistOpen(false));
-const clearHeldDirections = () => { keys.clear(); directionButtons.forEach(button => button.classList.remove('pressed')); resetJoystick(); scheduleLayoutRecalculation(); };
-addEventListener('resize', clearHeldDirections);
-addEventListener('orientationchange', clearHeldDirections);
 document.querySelector('#dismiss-portrait-guidance')!.addEventListener('click', () => { document.querySelector('#portrait-guidance')!.classList.add('dismissed'); scheduleLayoutRecalculation(); });
-applyControlMode(validControlMode(safeStorageGet(CONTROL_MODE_STORAGE_KEY)));
 document.querySelector('#game-shell')!.classList.add('title-phase');
 recalculateLayoutAndCamera(); refreshUI(); requestAnimationFrame(loop);
 assets.loadAll(npcPortraitPaths, progress => { loadingProgress = progress; }).then(() => { gamePhase = 'ready'; });
