@@ -5,12 +5,13 @@ import { dialogue, dialogueTopics } from './content/dialogue';
 import { getValidDialogueTopics, getValidNextDialogueTopics, meaningfulDialogueTopics, topLevelDialogueTopics, validateDialogueTopics, type DialogueContext } from './dialogueEngine';
 import { maps, mainCamp } from './content/maps';
 import { chooseLoadingTip } from './content/loadingTips';
+import { createChecklistUi, type ChecklistUiController } from './checklistUi';
 import { createInputController, type InputController } from './input';
 import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
 import { quests } from './content/quests';
-import { applyQuestRewards, createQuestState, getTrackedObjective, getVisibleObjectivesForQuest, getVisibleQuests, handleNpcQuestInteraction, handleQuestEvent, isObjectiveComplete as isQuestObjectiveComplete, isObjectiveUnlocked as isQuestObjectiveUnlocked, validateQuestDefinitions, type NpcQuestInteractionResult } from './questEngine';
+import { applyQuestRewards, createQuestState, getTrackedObjective, handleNpcQuestInteraction, handleQuestEvent, isObjectiveComplete as isQuestObjectiveComplete, isObjectiveUnlocked as isQuestObjectiveUnlocked, validateQuestDefinitions, type NpcQuestInteractionResult } from './questEngine';
 import type { DialogueEffect, DialogueSpeaker, DialogueTopic, InteractableDefinition, LocationDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, ObjectiveTargetType, QuestDefinition, QuestEvent, QuestEventResult, QuestId, Rect, SkillId, TerrainFeature, Thing } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
@@ -22,11 +23,11 @@ let loadingProgress: AssetProgress = { total: 0, settled: 0, loaded: 0, failed: 
 const loadingTip = chooseLoadingTip();
 const ui = {
   objective: document.querySelector('#objective')!, energy: document.querySelector<HTMLElement>('#energy-bar')!,
-  points: document.querySelector('#points')!, best: document.querySelector('#best')!, tasks: document.querySelector('#tasks')!,
+  points: document.querySelector('#points')!, best: document.querySelector('#best')!, tasks: document.querySelector<HTMLElement>('#tasks')!,
   dialogue: document.querySelector<HTMLElement>('#dialogue')!, speaker: document.querySelector('#speaker')!, text: document.querySelector('#dialogue-text')!,
   portraitPanel: document.querySelector('#portrait-panel')!, portrait: document.querySelector<HTMLImageElement>('#dialogue-portrait')!,
   choices: document.createElement('div'), hint: document.querySelector('#dialogue small')!,
-  toast: document.querySelector('#toast')!, checklist: document.querySelector('#checklist')!,
+  toast: document.querySelector('#toast')!, checklist: document.querySelector<HTMLElement>('#checklist')!,
   inspection: document.querySelector('#image-inspection')!, inspectionImage: document.querySelector<HTMLImageElement>('#inspection-image')!,
   inspectionTitle: document.querySelector('#inspection-title')!, inspectionCaption: document.querySelector('#inspection-caption')!,
   inspectionFallback: document.querySelector('#inspection-fallback')!,
@@ -131,11 +132,11 @@ function updateCamera() {
   camera.y = clampCameraAxis(currentMap.size.h, viewport.h, player.y + player.h / 2 - viewport.h / 2);
 }
 let input: InputController;
+let checklistUi: ChecklistUiController;
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 type DialogueUiState = { mode: 'closed' } | { mode: 'choosingTopic'; speaker: DialogueSpeaker; topics: DialogueTopic[]; selectedIndex: number } | { mode: 'showingResponse'; speaker: DialogueSpeaker; topicId?: string; response: string; followUpTopics?: DialogueTopic[]; selectedIndex?: number };
 let dialogueUiState: DialogueUiState = { mode: 'closed' };
-const collapsedChecklistRows = new Set<string>();
 const state = {
   inventory: { items: {} as Record<string, number> }, largePickupOrder: [] as string[], rewardedPickups: new Set<string>(), delivered: false, bridge: false,
   quests: createQuestState(quests),
@@ -188,84 +189,10 @@ function isObjectiveUnlocked(questId: string, objective: ObjectiveDefinition) {
   return quest ? isQuestObjectiveUnlocked(state.quests, quest, objective) : false;
 }
 function activeTask() { return getTrackedObjective(quests, state.quests); }
-function objective() { return activeTask()?.objective.label ?? 'Report to the Rally Circle'; }
-function escapeHtml(text: string) {
-  return text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
-}
-function titleCaseQuestline(id: string) {
-  return id.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
-}
-function questlineLabel(id: string) {
-  const labels: Record<string, string> = {
-    campErrands: 'Camp Errands',
-    cliffTeaser: 'Cliff Mysteries',
-    morningServiceCrew: 'Service Crew Duties',
-  };
-  return labels[id] ?? titleCaseQuestline(id);
-}
-function categoryLabel(category: QuestDefinition['category']) {
-  const labels: Record<QuestDefinition['category'], string> = { main: 'Main', tutorial: 'Tutorial', side: 'Side', hidden: 'Secret Found' };
-  return labels[category];
-}
-function categoryOrder(category: QuestDefinition['category']) {
-  return ({ main: 0, tutorial: 1, side: 2, hidden: 3 })[category];
-}
-function progressForQuests(groupQuests: QuestDefinition[]) {
-  let complete = 0, total = 0;
-  for (const quest of groupQuests) {
-    for (const objective of getVisibleObjectivesForQuest(state.quests, quest)) {
-      if (objective.required === false || objective.isOptional) continue;
-      total++;
-      if (isObjectiveComplete(quest.id, objective.id)) complete++;
-    }
-  }
-  return total ? `${complete}/${total}` : '';
-}
 function isQuestTrackable(quest: QuestDefinition) {
   return state.quests.questStatuses[quest.id] === 'active' && Boolean(getTrackedObjective([quest], state.quests));
 }
-function checklistToggle(key: string, label: string, depth: number, questsForProgress: QuestDefinition[]) {
-  const collapsed = collapsedChecklistRows.has(key);
-  const progress = progressForQuests(questsForProgress);
-  const rowClass = depth === 0 ? 'quest-category-row' : 'questline-row';
-  return `<li class="checklist-row checklist-toggle ${rowClass} depth-${depth}" data-action="toggle-checklist" data-key="${escapeHtml(key)}" role="button" tabindex="0"><span class="twisty">${collapsed ? '▸' : '▾'}</span><span>${escapeHtml(label)}</span>${progress ? `<b>${progress}</b>` : ''}</li>`;
-}
-function checklistQuestRow(quest: QuestDefinition, depth: number) {
-  const trackable = isQuestTrackable(quest);
-  const tracked = state.quests.trackedQuestId === quest.id && trackable;
-  const progress = progressForQuests([quest]);
-  const secret = quest.category === 'hidden' ? 'Secret Found: ' : '';
-  return `<li class="checklist-row quest-row depth-${depth}${tracked ? ' tracked' : ''}${trackable ? ' trackable' : ''}" data-action="track-quest" data-quest-id="${escapeHtml(quest.id)}" role="${trackable ? 'button' : 'listitem'}" ${trackable ? 'tabindex="0"' : ''}><span class="twisty"></span><span>${tracked ? '★ ' : ''}${escapeHtml(secret + quest.title)}</span>${tracked ? '<em>Tracked</em>' : ''}${progress ? `<b>${progress}</b>` : ''}</li>`;
-}
-function renderChecklist() {
-  const visibleQuests = [...getVisibleQuests(quests, state.quests)].sort((a, b) => categoryOrder(a.category) - categoryOrder(b.category) || (a.questlineId ?? '').localeCompare(b.questlineId ?? '') || (a.sequence ?? 9999) - (b.sequence ?? 9999) || a.title.localeCompare(b.title));
-  const rows: string[] = [];
-  const categories = [...new Set(visibleQuests.map(quest => quest.category))].sort((a, b) => categoryOrder(a) - categoryOrder(b));
-  for (const category of categories) {
-    const categoryQuests = visibleQuests.filter(quest => quest.category === category);
-    const categoryKey = `category:${category}`;
-    rows.push(checklistToggle(categoryKey, categoryLabel(category), 0, categoryQuests));
-    if (collapsedChecklistRows.has(categoryKey)) continue;
-    const questlines = [...new Set(categoryQuests.map(quest => quest.questlineId ?? 'misc'))].sort((a, b) => questlineLabel(a).localeCompare(questlineLabel(b)));
-    for (const questlineId of questlines) {
-      const questlineQuests = categoryQuests.filter(quest => (quest.questlineId ?? 'misc') === questlineId);
-      const questlineKey = `questline:${category}:${questlineId}`;
-      rows.push(checklistToggle(questlineKey, questlineLabel(questlineId), 1, questlineQuests));
-      if (collapsedChecklistRows.has(questlineKey)) continue;
-      for (const quest of questlineQuests) {
-        rows.push(checklistQuestRow(quest, 2));
-        for (const objective of getVisibleObjectivesForQuest(state.quests, quest)) {
-          const classes = ['checklist-row', 'objective-row', 'depth-3'];
-          if (isObjectiveComplete(quest.id, objective.id)) classes.push('done');
-          else if (!isObjectiveUnlocked(quest.id, objective)) classes.push('locked');
-          const trackable = isQuestTrackable(quest);
-          rows.push(`<li class="${classes.join(' ')}${trackable ? ' trackable' : ''}" data-action="track-quest" data-quest-id="${escapeHtml(quest.id)}" role="${trackable ? 'button' : 'listitem'}" ${trackable ? 'tabindex="0"' : ''}><span>${escapeHtml(objective.label)}</span></li>`);
-        }
-      }
-    }
-  }
-  return rows.join('');
-}
+function objective() { return activeTask()?.objective.label ?? 'Report to the Rally Circle'; }
 function trackQuest(questId: QuestId) {
   const quest = quests.find(candidate => candidate.id === questId);
   if (!quest || !isQuestTrackable(quest)) return;
@@ -323,18 +250,11 @@ function resolveObjectiveTarget(task: ObjectiveDefinition) {
   if (!target) return;
   return { target, mapId: targetMap.id, label: objectiveTarget.label ?? target.label };
 }
-function updateChecklistScrollButtons() {
-  const canScroll = ui.tasks.scrollHeight > ui.tasks.clientHeight + 1;
-  ui.checklistScrollUp.disabled = !canScroll || ui.tasks.scrollTop <= 0;
-  ui.checklistScrollDown.disabled = !canScroll || ui.tasks.scrollTop + ui.tasks.clientHeight >= ui.tasks.scrollHeight - 1;
-}
-
 function refreshUI() {
   ui.energy.style.width = `${player.energy}%`; ui.points.textContent = `${player.points} SP`;
   const best = Number(safeStorageGet('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
   ui.objective.textContent = `${currentMap.displayName}: ${objective()}`;
-  ui.tasks.innerHTML = renderChecklist();
-  updateChecklistScrollButtons();
+  checklistUi.refresh();
   const large = visibleLabels('large'), tray = visibleLabels('tray'), small = visibleLabels('small');
   const hands = large.length === 1 && carrySize(state.largePickupOrder.at(-1) ?? '') === 2 ? `${large[0]} (both hands)` : `${large[0] ?? 'empty'} | ${large[1] ?? 'empty'}`;
   ui.carrySummary.textContent = [`Hands: ${hands}`, tray.length ? `Tray: ${tray.join(', ')}` : '', small.length ? `Small: ${small.join(', ')}` : ''].filter(Boolean).join(' · ');
@@ -494,7 +414,7 @@ function interact() {
   }
   toast('Nothing useful nearby. Service Crew Rule #2: check the weirdest place first.');
 }
-function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionOpen || ui.checklist.classList.contains('open'); }
+function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionOpen || checklistUi.isOpen(); }
 function dropLastLargeItem() {
   const id = state.largePickupOrder.at(-1); if (!id) { toast('No bulky supply to set down.'); return; }
   const item = itemById(id); if (!item) return;
@@ -703,7 +623,6 @@ function startGame() {
 let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (gamePhase === 'playing' && toastTimer > 0 && (toastTimer -= dt) <= 0) ui.toast.classList.add('hidden'); draw(); requestAnimationFrame(loop); }
 const directionButtons = document.querySelectorAll<HTMLButtonElement>('[data-dir]');
 const actionButton = document.querySelector<HTMLButtonElement>('#action-button')!;
-const preventControlDefault = (event: Event) => event.preventDefault();
 input = createInputController({
   elements: {
     canvas,
@@ -736,40 +655,24 @@ ui.fullscreenButton.addEventListener('click', () => requestGameFullscreen(true))
 document.addEventListener('fullscreenchange', updateFullscreenButtonState);
 document.querySelector('#close-inspection')!.addEventListener('click', closeInspection); ui.inspection.addEventListener('click', event => { if (event.target === ui.inspection) closeInspection(); });
 const checklistButton = document.querySelector<HTMLButtonElement>('#checklist-button')!;
-const setChecklistOpen = (open: boolean) => {
-  ui.checklist.classList.toggle('open', open);
-  ui.checklist.setAttribute('aria-hidden', String(!open));
-  checklistButton.setAttribute('aria-expanded', String(open));
-  input.resetJoystick();
-  requestAnimationFrame(updateChecklistScrollButtons);
-};
-const scrollChecklist = (direction: 1 | -1) => ui.tasks.scrollBy({ top: direction * 120, behavior: 'smooth' });
-ui.tasks.addEventListener('scroll', updateChecklistScrollButtons, { passive: true });
-const activateChecklistRow = (target: EventTarget | null) => {
-  const row = target instanceof HTMLElement ? target.closest<HTMLElement>('[data-action]') : undefined;
-  if (!row) return false;
-  if (row.dataset.action === 'toggle-checklist' && row.dataset.key) {
-    if (collapsedChecklistRows.has(row.dataset.key)) collapsedChecklistRows.delete(row.dataset.key);
-    else collapsedChecklistRows.add(row.dataset.key);
-    refreshUI(); return true;
-  }
-  if (row.dataset.action === 'track-quest' && row.dataset.questId) {
-    trackQuest(row.dataset.questId); return true;
-  }
-  return false;
-};
-ui.tasks.addEventListener('click', event => { if (activateChecklistRow(event.target)) event.preventDefault(); });
-ui.tasks.addEventListener('keydown', event => {
-  const keyboardEvent = event as KeyboardEvent;
-  if (keyboardEvent.key !== 'Enter' && keyboardEvent.key !== ' ') return;
-  if (activateChecklistRow(event.target)) event.preventDefault();
+checklistUi = createChecklistUi({
+  elements: {
+    checklist: ui.checklist,
+    tasks: ui.tasks,
+    checklistButton,
+    closeButton: document.querySelector('#close-checklist')!,
+    scrollUpButton: ui.checklistScrollUp,
+    scrollDownButton: ui.checklistScrollDown,
+  },
+  quests,
+  getQuestState: () => state.quests,
+  isObjectiveComplete,
+  isObjectiveUnlocked,
+  isQuestTrackable,
+  onTrackQuest: trackQuest,
+  onOpenChanged: () => { input.resetJoystick(); },
+  canToggleOpen: () => gamePhase === 'playing',
 });
-ui.checklistScrollUp.addEventListener('pointerdown', event => { event.preventDefault(); scrollChecklist(-1); });
-ui.checklistScrollDown.addEventListener('pointerdown', event => { event.preventDefault(); scrollChecklist(1); });
-ui.checklistScrollUp.addEventListener('contextmenu', preventControlDefault);
-ui.checklistScrollDown.addEventListener('contextmenu', preventControlDefault);
-checklistButton.addEventListener('click', () => { if (gamePhase === 'playing') setChecklistOpen(!ui.checklist.classList.contains('open')); });
-document.querySelector('#close-checklist')!.addEventListener('click', () => setChecklistOpen(false));
 document.querySelector('#dismiss-portrait-guidance')!.addEventListener('click', () => { document.querySelector('#portrait-guidance')!.classList.add('dismissed'); scheduleLayoutRecalculation(); });
 document.querySelector('#game-shell')!.classList.add('title-phase');
 recalculateLayoutAndCamera(); refreshUI(); requestAnimationFrame(loop);
