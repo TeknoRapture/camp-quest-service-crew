@@ -238,6 +238,23 @@ function completeBridgeObjective() {
   if (!result.completedObjectives.length) return false;
   state.bridge = true; toast('Under Construction: Back 40 coming soon! +50 SP'); refreshUI(); return true;
 }
+
+function cleanTargetObjectiveFor(targetId: string) {
+  return quests.flatMap(quest => quest.objectives.map(objective => ({ quest, objective })))
+    .find(({ objective }) => objective.type === 'cleanTarget' && objective.targetId === targetId && (!objective.mapId || objective.mapId === currentMap.id));
+}
+function tryCleanTarget(target: InteractableDefinition) {
+  const match = cleanTargetObjectiveFor(target.id);
+  if (!match) return false;
+  if (isObjectiveComplete(match.quest.id, match.objective.id)) { toast('Already clean! This spot is ready for inspection and/or dramatic sparkle noises.'); return true; }
+  if (!hasItem('bathroomMop')) { toast('You need the blue bathroom mop for this job.'); return true; }
+  if (state.quests.questStatuses[match.quest.id] !== 'active' || !isObjectiveUnlocked(match.quest.id, match.objective)) {
+    toast('This cleaning spot is on the checklist, but Coop has not released that job yet. Finish the current supply steps first.'); return true;
+  }
+  const result = processQuestEvent({ type: 'cleanTargetCompleted', targetId: target.id, mapId: currentMap.id });
+  if (!result.completedObjectives.length) { toast('This spot resisted the paperwork. Try the current checklist target first.'); return true; }
+  refreshUI(); return true;
+}
 function resolveObjectiveTarget(task: ObjectiveDefinition) {
   const objectiveTarget = task.arrowTarget ?? task.target;
   if (!objectiveTarget) return;
@@ -384,6 +401,7 @@ function interact() {
       inspectImage(nearbyInteractable.title, nearbyInteractable.assetId, nearbyInteractable.caption ?? nearbyInteractable.label); return;
     }
     if (nearbyInteractable.id === 'back40TeaserMessage') { completeBridgeObjective(); return; }
+    if (tryCleanTarget(nearbyInteractable)) return;
     if (nearbyInteractable.kind === 'message' || nearbyInteractable.kind === 'task-location') {
       const message = nearbyInteractable.id === 'blockedBridgeMessage' && isBridgeUnlocked()
         ? 'The bridge inspection is complete. Cross carefully for a tiny peek at the Back 40!'

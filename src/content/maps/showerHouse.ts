@@ -35,8 +35,20 @@ export const showerHouse: MapDefinition = {
   ],
   interactables: [
     {
-      id: 'showerCleaningSpot', kind: 'task-location', label: 'Inspect cleaning spot', x: 105, y: 225, w: 145, h: 70,
+      id: 'showerCleaningSpot1', kind: 'task-location', label: 'Dirty shower stall 1', x: 105, y: 225, w: 95, h: 56,
       message: 'A heroic scrubbing opportunity. Blue bathroom mop only—Service Crew has standards.',
+    },
+    {
+      id: 'showerCleaningSpot2', kind: 'task-location', label: 'Dirty shower stall 2', x: 215, y: 225, w: 95, h: 56,
+      message: 'This spot looks like it lost a wrestling match with muddy flip-flops.',
+    },
+    {
+      id: 'showerCleaningSpot3', kind: 'task-location', label: 'Dirty sink corner', x: 325, y: 310, w: 100, h: 58,
+      message: 'Mystery splashes. Probably camp chaos. Definitely mop territory.',
+    },
+    {
+      id: 'showerCleaningSpot4', kind: 'task-location', label: 'Dirty changing area', x: 455, y: 380, w: 110, h: 58,
+      message: 'The floor is requesting immediate Service Crew encouragement.',
     },
   ],
   zones: [
