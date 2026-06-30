@@ -12,7 +12,7 @@ import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
 import { quests } from './content/quests';
 import { applyQuestRewards, createQuestState, getTrackedObjective, handleNpcQuestInteraction, handleQuestEvent, isObjectiveComplete as isQuestObjectiveComplete, isObjectiveUnlocked as isQuestObjectiveUnlocked, validateQuestDefinitions, type NpcQuestInteractionResult } from './questEngine';
-import type { DialogueEffect, DialogueSpeaker, DialogueTopic, InteractableDefinition, LocationDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, ObjectiveTargetType, QuestDefinition, QuestEvent, QuestEventResult, QuestId, Rect, SkillId, TerrainFeature, Thing } from './content/types';
+import type { DialogueEffect, DialogueSpeaker, DialogueTopic, InteractableDefinition, LocationDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, ObjectiveTargetType, ItemDefinition, QuestDefinition, QuestEvent, QuestEventResult, QuestId, Rect, SkillId, TerrainFeature, Thing } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
@@ -154,6 +154,19 @@ if (questValidationIssues.length) console.warn('Quest definition validation issu
 const dialogueValidationIssues = validateDialogueTopics(dialogueTopics, { npcs: allNpcs, quests, items: allItems, maps });
 if (dialogueValidationIssues.length) console.warn('Dialogue topic validation issues:', dialogueValidationIssues);
 const itemById = (id: string) => allItems.find(item => item.id === id);
+const cloneItem = (item: ItemDefinition): ItemDefinition => ({ ...item });
+const runtimeItemsByMapId: Record<string, ItemDefinition[]> = Object.fromEntries(Object.values(maps).map(map => [map.id, map.items.map(cloneItem)]));
+function mapItems(mapId: string) { return runtimeItemsByMapId[mapId] ?? (runtimeItemsByMapId[mapId] = []); }
+function currentItems() { return mapItems(currentMap.id); }
+function putItemOnCurrentMap(id: string) {
+  const template = itemById(id); if (!template) return;
+  const items = currentItems();
+  const item = items.find(candidate => candidate.id === id && candidate.done) ?? (() => { const dropped = cloneItem(template); items.push(dropped); return dropped; })();
+  item.done = false;
+  item.x = Math.max(5, Math.min(currentMap.size.w - item.w - 5, player.x + player.w + 18));
+  item.y = Math.max(5, Math.min(currentMap.size.h - item.h - 5, player.y));
+  return item;
+}
 const itemCount = (id: string) => state.inventory.items[id] ?? 0;
 const hasItem = (id: string) => itemCount(id) > 0;
 const carryType = (id: string) => itemById(id)?.carryType ?? 'small';
@@ -422,7 +435,7 @@ function interact() {
   if (npc && dist(player, npc) < 80) {
     startNpcDialogue(npc); return;
   }
-  const item = currentMap.items.filter(({ done }) => !done).sort((a, b) => dist(player, a) - dist(player, b))[0];
+  const item = currentItems().filter(({ done }) => !done).sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (item && dist(player, item) < 70) {
     if (!canCarry(item.id)) { toast(carrySize(item.id) === 2 ? 'That takes both hands, champ. Set down a bulky supply first.' : 'Your hands are full! Set down a bulky supply first.'); return; }
     item.done = true; addItem(item.id);
@@ -435,8 +448,8 @@ function interact() {
 function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionOpen || checklistUi.isOpen(); }
 function dropLastLargeItem() {
   const id = state.largePickupOrder.at(-1); if (!id) { toast('No bulky supply to set down.'); return; }
-  const item = itemById(id); if (!item) return;
-  removeItem(id); item.done = false; item.x = Math.max(5, Math.min(currentMap.size.w - item.w - 5, player.x + player.w + 18)); item.y = Math.max(5, Math.min(currentMap.size.h - item.h - 5, player.y));
+  const item = putItemOnCurrentMap(id); if (!item) return;
+  removeItem(id);
   toast(`${item.inventoryLabel ?? item.label} set down. Your mighty Service Crew arms thank you.`); refreshUI();
 }
 function move(dx: number, dy: number) {
@@ -510,7 +523,7 @@ function drawTerrainDecor() {
     const maxX = Math.min(currentMap.size.w, camera.x + viewport.w + margin);
     const minY = Math.max(55, Math.floor((camera.y - margin) / spacing) * spacing + 55);
     const maxY = Math.min(currentMap.size.h, camera.y + viewport.h + margin);
-    const protectedThings: Rect[] = [...currentMap.buildings, ...currentMap.walls, ...currentMap.npcs, ...currentMap.items, ...currentMap.interactables, ...currentMap.exits, ...currentMap.hazards];
+    const protectedThings: Rect[] = [...currentMap.buildings, ...currentMap.walls, ...currentMap.npcs, ...currentItems(), ...currentMap.interactables, ...currentMap.exits, ...currentMap.hazards];
     for (let x = minX; x < maxX; x += spacing) for (let y = minY; y < maxY; y += spacing) {
       const tree = { x: x - 25, y: y - 30, w: 50, h: 65 };
       const inWoods = currentMap.terrain.some(feature => feature.kind === 'woods' && intersects(tree, feature));
@@ -542,7 +555,7 @@ function drawBelowActors() {
 }
 function drawActors() {
   currentMap.hazards.forEach(hazard => { if (hazard.assetId && drawSprite(ctx, assets, hazard.assetId, hazard)) { text(hazard.label, hazard.x + hazard.w / 2, hazard.y - 5, 10, '#e9dcaf'); return; } ctx.globalAlpha = .7; ctx.fillStyle = hazard.kind === 'mud' ? '#69553c' : hazard.kind === 'wet' || hazard.kind === 'water' ? '#68a9c7' : '#738044'; ctx.beginPath(); ctx.ellipse(hazard.x + hazard.w / 2, hazard.y + hazard.h / 2, hazard.w / 2, hazard.h / 2, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; });
-  currentMap.items.filter(({ done }) => !done).forEach(item => { if (item.assetId && drawSprite(ctx, assets, item.assetId, item)) { text(item.label, item.x + item.w / 2, item.y - 6, 10, '#fff3ae'); return; } ctx.fillStyle = item.id === 'crate' ? '#c58a45' : '#ffe16b'; ctx.fillRect(item.x, item.y, item.w, item.h); });
+  currentItems().filter(({ done }) => !done).forEach(item => { if (item.assetId && drawSprite(ctx, assets, item.assetId, item)) { text(item.label, item.x + item.w / 2, item.y - 6, 10, '#fff3ae'); return; } ctx.fillStyle = item.id === 'crate' ? '#c58a45' : '#ffe16b'; ctx.fillRect(item.x, item.y, item.w, item.h); });
   currentMap.npcs.forEach(npc => { ctx.fillStyle = npc.id === 'cliff' ? '#342c43' : npc.id === 'crazyjoe' ? '#cf6f38' : '#386d95'; ctx.beginPath(); ctx.arc(npc.x + npc.w / 2, npc.y + 10, 10, 0, 7); ctx.fill(); ctx.fillRect(npc.x, npc.y + 18, npc.w, npc.h - 18); text(npc.label, npc.x + npc.w / 2, npc.y - 7, 11, npc.id === 'cliff' ? '#b8a5c7' : '#fff'); });
   if (!drawSprite(ctx, assets, 'player', player, { width: 24, height: 38, offsetY: 4 })) { ctx.fillStyle = '#edb13d'; ctx.beginPath(); ctx.arc(player.x + 12, player.y + 9, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#d95637'; ctx.fillRect(player.x, player.y + 18, 24, 12); } text('YOU', player.x + 12, player.y - 6, 10, '#fff');
 }
