@@ -8,6 +8,7 @@ import { chooseLoadingTip } from './content/loadingTips';
 import { createChecklistUi, type ChecklistUiController } from './checklistUi';
 import { createInputController, type InputController } from './input';
 import { routeWorldInteraction } from './interactionRouter';
+import { createInventoryHelpers } from './inventory';
 import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
@@ -139,7 +140,7 @@ let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 type DialogueUiState = { mode: 'closed' } | { mode: 'choosingTopic'; speaker: DialogueSpeaker; topics: DialogueTopic[]; selectedIndex: number } | { mode: 'showingResponse'; speaker: DialogueSpeaker; topicId?: string; response: string; followUpTopics?: DialogueTopic[]; selectedIndex?: number };
 let dialogueUiState: DialogueUiState = { mode: 'closed' };
 const state = {
-  inventory: { items: {} as Record<string, number> }, largePickupOrder: [] as string[], rewardedPickups: new Set<string>(), delivered: false, bridge: false,
+  inventory: { items: {} as Record<string, number>, largePickupOrder: [] as string[] }, rewardedPickups: new Set<string>(), delivered: false, bridge: false,
   quests: createQuestState(quests),
   dialogue: { flags: {} as Record<string, boolean | string | number>, seenTopicIds: new Set<string>() },
   skills: { nature: false, swimming: false, climbing: false } as Record<SkillId, boolean>,
@@ -168,15 +169,7 @@ function putItemOnCurrentMap(id: string) {
   item.y = Math.max(5, Math.min(currentMap.size.h - item.h - 5, player.y));
   return item;
 }
-const itemCount = (id: string) => state.inventory.items[id] ?? 0;
-const hasItem = (id: string) => itemCount(id) > 0;
-const carryType = (id: string) => itemById(id)?.carryType ?? 'small';
-const carrySize = (id: string) => itemById(id)?.carrySize ?? 1;
-const largeUnitsUsed = () => Object.entries(state.inventory.items).reduce((sum, [id, quantity]) => sum + (carryType(id) === 'large' ? carrySize(id) * quantity : 0), 0);
-function canCarry(id: string) { return carryType(id) !== 'large' || largeUnitsUsed() + carrySize(id) <= 2; }
-function addItem(id: string) { state.inventory.items[id] = itemCount(id) + 1; if (carryType(id) === 'large') state.largePickupOrder.push(id); }
-function removeItem(id: string) { if (itemCount(id) <= 1) delete state.inventory.items[id]; else state.inventory.items[id]--; state.largePickupOrder = state.largePickupOrder.filter(carriedId => carriedId !== id || hasItem(id)); }
-function visibleLabels(type: 'large' | 'tray' | 'small') { return Object.entries(state.inventory.items).flatMap(([id, quantity]) => { const item = itemById(id); if (!item || carryType(id) !== type || item.displayInInventory === false) return []; return Array(quantity).fill(item.inventoryLabel ?? item.label); }); }
+const inventory = createInventoryHelpers(state.inventory, itemById);
 
 function buildingCollisionRect(building: LocationDefinition): Rect {
   const frontOverlap = Math.max(0, Math.min(building.h, building.frontOverlap ?? currentMap.buildingFrontOverlap ?? 0));
@@ -261,7 +254,7 @@ function tryCleanTarget(target: InteractableDefinition) {
   const match = cleanTargetObjectiveFor(target.id);
   if (!match) return false;
   if (isObjectiveComplete(match.quest.id, match.objective.id)) { toast('Already clean! This spot is ready for inspection and/or dramatic sparkle noises.'); return true; }
-  if (!hasItem('bathroomMop')) { toast('You need the blue bathroom mop for this job.'); return true; }
+  if (!inventory.hasItem('bathroomMop')) { toast('You need the blue bathroom mop for this job.'); return true; }
   if (state.quests.questStatuses[match.quest.id] !== 'active' || !isObjectiveUnlocked(match.quest.id, match.objective)) {
     toast('This cleaning spot is on the checklist, but Coop has not released that job yet. Finish the current supply steps first.'); return true;
   }
@@ -286,10 +279,10 @@ function refreshUI() {
   const best = Number(safeStorageGet('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
   ui.objective.textContent = `${currentMap.displayName}: ${objective()}`;
   checklistUi.refresh();
-  const large = visibleLabels('large'), tray = visibleLabels('tray'), small = visibleLabels('small');
-  const hands = large.length === 1 && carrySize(state.largePickupOrder.at(-1) ?? '') === 2 ? `${large[0]} (both hands)` : `${large[0] ?? 'empty'} | ${large[1] ?? 'empty'}`;
+  const large = inventory.visibleLabels('large'), tray = inventory.visibleLabels('tray'), small = inventory.visibleLabels('small');
+  const hands = large.length === 1 && inventory.carrySize(inventory.lastLargeItemId() ?? '') === 2 ? `${large[0]} (both hands)` : `${large[0] ?? 'empty'} | ${large[1] ?? 'empty'}`;
   ui.carrySummary.textContent = [`Hands: ${hands}`, tray.length ? `Tray: ${tray.join(', ')}` : '', small.length ? `Small: ${small.join(', ')}` : ''].filter(Boolean).join(' · ');
-  ui.dropButton.disabled = state.largePickupOrder.length === 0;
+  ui.dropButton.disabled = !inventory.canDropLargeItem();
 }
 function setDialogueSpeaker(speaker: DialogueSpeaker) {
   const displayName = speaker.displayName ?? speaker.label ?? 'Camp Staff';
@@ -354,7 +347,7 @@ function applyDialogueEffect(effect: DialogueEffect) {
   if (effect.type === 'showToast') { toast(effect.text); return; }
 }
 function dialogueContext(npc: NPCDefinition): DialogueContext {
-  return { npc, mapId: currentMap.id, npcs: allNpcs, quests, questState: state.quests, dialogueState: state.dialogue, heldItemCount: itemCount };
+  return { npc, mapId: currentMap.id, npcs: allNpcs, quests, questState: state.quests, dialogueState: state.dialogue, heldItemCount: inventory.itemCount };
 }
 function runDialogueTopic(speaker: DialogueSpeaker, topic: DialogueTopic, allowFollowUps = true) {
   for (const effect of topic.effects ?? []) applyDialogueEffect(effect);
@@ -411,10 +404,7 @@ function interact() {
     quests,
     currentItems,
     dist,
-    carrySize,
-    canCarry,
-    addItem,
-    removeItem,
+    inventory,
     isBridgeUnlocked,
     isObjectiveUnlocked,
     processQuestEvent,
@@ -429,9 +419,9 @@ function interact() {
 }
 function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionOpen || checklistUi.isOpen(); }
 function dropLastLargeItem() {
-  const id = state.largePickupOrder.at(-1); if (!id) { toast('No bulky supply to set down.'); return; }
+  const id = inventory.lastLargeItemId(); if (!id) { toast('No bulky supply to set down.'); return; }
   const item = putItemOnCurrentMap(id); if (!item) return;
-  removeItem(id);
+  inventory.removeItem(id);
   toast(`${item.inventoryLabel ?? item.label} set down. Your mighty Service Crew arms thank you.`); refreshUI();
 }
 function move(dx: number, dy: number) {

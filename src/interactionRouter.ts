@@ -1,8 +1,8 @@
 import type { AssetId } from './assets';
+import type { CarriedInventoryHelpers } from './inventory';
 import type { InteractableDefinition, ItemDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, QuestDefinition, QuestEvent, QuestEventResult, Rect } from './content/types';
 
 type WorldInteractionState = {
-  inventory: { items: Record<string, number> };
   rewardedPickups: Set<string>;
   delivered: boolean;
 };
@@ -14,10 +14,7 @@ export type WorldInteractionContext = {
   quests: QuestDefinition[];
   currentItems: () => ItemDefinition[];
   dist: (a: Rect, b: Rect) => number;
-  carrySize: (id: string) => number;
-  canCarry: (id: string) => boolean;
-  addItem: (id: string) => void;
-  removeItem: (id: string) => void;
+  inventory: Pick<CarriedInventoryHelpers, 'carriedItemIds' | 'carrySize' | 'canCarry' | 'addItem' | 'removeItem'>;
   isBridgeUnlocked: () => boolean;
   isObjectiveUnlocked: (questId: string, objective: ObjectiveDefinition) => boolean;
   processQuestEvent: (event: QuestEvent) => QuestEventResult;
@@ -38,10 +35,7 @@ export function routeWorldInteraction(context: WorldInteractionContext) {
     quests,
     currentItems,
     dist,
-    carrySize,
-    canCarry,
-    addItem,
-    removeItem,
+    inventory,
     isBridgeUnlocked,
     isObjectiveUnlocked,
     processQuestEvent,
@@ -72,13 +66,13 @@ export function routeWorldInteraction(context: WorldInteractionContext) {
       toast(message); return;
     }
     if (nearbyInteractable.kind === 'delivery-zone' && !state.delivered) {
-      const deliverableItemId = Object.keys(state.inventory.items).find(itemId => quests.some(quest => quest.objectives.some(objective => objective.type === 'deliverItem' && objective.itemId === itemId && objective.interactableId === nearbyInteractable.id)));
+      const deliverableItemId = inventory.carriedItemIds().find(itemId => quests.some(quest => quest.objectives.some(objective => objective.type === 'deliverItem' && objective.itemId === itemId && objective.interactableId === nearbyInteractable.id)));
       if (!deliverableItemId) return;
       const deliveryReady = quests.some(quest => quest.objectives.some(objective => objective.type === 'deliverItem' && objective.itemId === deliverableItemId && objective.interactableId === nearbyInteractable.id && isObjectiveUnlocked(quest.id, objective)));
       if (!deliveryReady) { toast('Hang onto that crate until the supply hunt is checked off.'); return; }
       const result = processQuestEvent({ type: 'itemDelivered', itemId: deliverableItemId, interactableId: nearbyInteractable.id, mapId: currentMap.id });
       if (!result.completedObjectives.length) return;
-      state.delivered = true; removeItem(deliverableItemId); toast('Crate delivered! +100 SP'); refreshUI(); return;
+      state.delivered = true; inventory.removeItem(deliverableItemId); toast('Crate delivered! +100 SP'); refreshUI(); return;
     }
   }
   const npc = currentMap.npcs.filter(({ id }) => id !== 'cliff').sort((a, b) => dist(player, a) - dist(player, b))[0];
@@ -87,8 +81,8 @@ export function routeWorldInteraction(context: WorldInteractionContext) {
   }
   const item = currentItems().filter(({ done }) => !done).sort((a, b) => dist(player, a) - dist(player, b))[0];
   if (item && dist(player, item) < 70) {
-    if (!canCarry(item.id)) { toast(carrySize(item.id) === 2 ? 'That takes both hands, champ. Set down a bulky supply first.' : 'Your hands are full! Set down a bulky supply first.'); return; }
-    item.done = true; addItem(item.id);
+    if (!inventory.canCarry(item.id)) { toast(inventory.carrySize(item.id) === 2 ? 'That takes both hands, champ. Set down a bulky supply first.' : 'Your hands are full! Set down a bulky supply first.'); return; }
+    item.done = true; inventory.addItem(item.id);
     const result = processQuestEvent({ type: 'itemPickedUp', itemId: item.id, mapId: currentMap.id });
     const firstPickup = result.completedObjectives.length > 0 && !state.rewardedPickups.has(item.id); if (firstPickup) state.rewardedPickups.add(item.id);
     toast(`${item.label} recovered!${firstPickup ? ' +50 SP' : ''}`); refreshUI(); return;
