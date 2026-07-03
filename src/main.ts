@@ -10,6 +10,7 @@ import { createInputController, type InputController } from './input';
 import { routeWorldInteraction } from './interactionRouter';
 import { createInventoryHelpers } from './inventory';
 import { createWorldItems } from './worldItems';
+import { createHudUi, type HudUiController } from './hudUi';
 import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
@@ -136,6 +137,7 @@ function updateCamera() {
 }
 let input: InputController;
 let checklistUi: ChecklistUiController;
+let hudUi: HudUiController;
 let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 type DialogueUiState = { mode: 'closed' } | { mode: 'choosingTopic'; speaker: DialogueSpeaker; topics: DialogueTopic[]; selectedIndex: number } | { mode: 'showingResponse'; speaker: DialogueSpeaker; topicId?: string; response: string; followUpTopics?: DialogueTopic[]; selectedIndex?: number };
@@ -265,14 +267,21 @@ function resolveObjectiveTarget(task: ObjectiveDefinition) {
   return { target, mapId: targetMap.id, label: objectiveTarget.label ?? target.label };
 }
 function refreshUI() {
-  ui.energy.style.width = `${player.energy}%`; ui.points.textContent = `${player.points} SP`;
-  const best = Number(safeStorageGet('campQuestBest') || 0); ui.best.textContent = `BEST ${Math.max(best, player.points)}`;
-  ui.objective.textContent = `${currentMap.displayName}: ${objective()}`;
+  const lastLargeItemId = inventory.lastLargeItemId();
+  hudUi.refreshHud({
+    energy: player.energy,
+    points: player.points,
+    best: Number(safeStorageGet('campQuestBest') || 0),
+    mapDisplayName: currentMap.displayName,
+    objective: objective(),
+    largeLabels: inventory.visibleLabels('large'),
+    trayLabels: inventory.visibleLabels('tray'),
+    smallLabels: inventory.visibleLabels('small'),
+    lastLargeItemId,
+    lastLargeCarrySize: inventory.carrySize(lastLargeItemId ?? ''),
+    canDropLargeItem: inventory.canDropLargeItem(),
+  });
   checklistUi.refresh();
-  const large = inventory.visibleLabels('large'), tray = inventory.visibleLabels('tray'), small = inventory.visibleLabels('small');
-  const hands = large.length === 1 && inventory.carrySize(inventory.lastLargeItemId() ?? '') === 2 ? `${large[0]} (both hands)` : `${large[0] ?? 'empty'} | ${large[1] ?? 'empty'}`;
-  ui.carrySummary.textContent = [`Hands: ${hands}`, tray.length ? `Tray: ${tray.join(', ')}` : '', small.length ? `Small: ${small.join(', ')}` : ''].filter(Boolean).join(' · ');
-  ui.dropButton.disabled = !inventory.canDropLargeItem();
 }
 function setDialogueSpeaker(speaker: DialogueSpeaker) {
   const displayName = speaker.displayName ?? speaker.label ?? 'Camp Staff';
@@ -364,7 +373,7 @@ function inspectImage(title: string, assetId: AssetId, caption: string) {
   ui.inspectionImage.src = assets.url(assetId); ui.inspection.classList.remove('hidden');
 }
 function closeInspection() { inspectionOpen = false; ui.inspection.classList.add('hidden'); }
-function toast(text: string) { ui.toast.textContent = text; ui.toast.classList.remove('hidden'); toastTimer = 2.8; }
+function toast(text: string) { hudUi.showToast(text); toastTimer = 2.8; }
 function dist(a: Rect, b: Rect) { return Math.hypot(a.x + a.w / 2 - b.x - b.w / 2, a.y + a.h / 2 - b.y - b.h / 2); }
 function intersects(a: Rect, b: Rect) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
 function safeStorageGet(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -613,7 +622,16 @@ function startGame() {
   showDialogue(mainCamp.npcs[0], dialogue.opening[0]); refreshUI(); scheduleLayoutRecalculation();
 }
 
-let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (gamePhase === 'playing' && toastTimer > 0 && (toastTimer -= dt) <= 0) ui.toast.classList.add('hidden'); draw(); requestAnimationFrame(loop); }
+let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (gamePhase === 'playing' && toastTimer > 0 && (toastTimer -= dt) <= 0) hudUi.hideToast(); draw(); requestAnimationFrame(loop); }
+hudUi = createHudUi({
+  objective: ui.objective,
+  energy: ui.energy,
+  points: ui.points,
+  best: ui.best,
+  carrySummary: ui.carrySummary,
+  dropButton: ui.dropButton,
+  toast: ui.toast,
+});
 const directionButtons = document.querySelectorAll<HTMLButtonElement>('[data-dir]');
 const actionButton = document.querySelector<HTMLButtonElement>('#action-button')!;
 input = createInputController({
