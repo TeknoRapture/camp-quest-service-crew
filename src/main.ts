@@ -9,12 +9,13 @@ import { createChecklistUi, type ChecklistUiController } from './checklistUi';
 import { createInputController, type InputController } from './input';
 import { routeWorldInteraction } from './interactionRouter';
 import { createInventoryHelpers } from './inventory';
+import { createWorldItems } from './worldItems';
 import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
 import { quests } from './content/quests';
 import { applyQuestRewards, createQuestState, getTrackedObjective, handleNpcQuestInteraction, handleQuestEvent, isObjectiveComplete as isQuestObjectiveComplete, isObjectiveUnlocked as isQuestObjectiveUnlocked, validateQuestDefinitions, type NpcQuestInteractionResult } from './questEngine';
-import type { DialogueEffect, DialogueSpeaker, DialogueTopic, InteractableDefinition, LocationDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, ObjectiveTargetType, ItemDefinition, QuestDefinition, QuestEvent, QuestEventResult, QuestId, Rect, SkillId, TerrainFeature, Thing } from './content/types';
+import type { DialogueEffect, DialogueSpeaker, DialogueTopic, InteractableDefinition, LocationDefinition, MapDefinition, NPCDefinition, ObjectiveDefinition, ObjectiveTargetType, QuestDefinition, QuestEvent, QuestEventResult, QuestId, Rect, SkillId, TerrainFeature, Thing } from './content/types';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
@@ -149,26 +150,15 @@ ui.choices.className = 'dialogue-choices';
 ui.choices.setAttribute('aria-label', 'Dialogue topics');
 ui.text.insertAdjacentElement('afterend', ui.choices);
 
-const allItems = Object.values(maps).flatMap(map => map.items);
+const worldItems = createWorldItems(maps);
+const allItems = worldItems.allItemTemplates;
 const allNpcs = Object.values(maps).flatMap(map => map.npcs);
 const questValidationIssues = validateQuestDefinitions(quests, { npcs: allNpcs, items: allItems, maps });
 if (questValidationIssues.length) console.warn('Quest definition validation issues:', questValidationIssues);
 const dialogueValidationIssues = validateDialogueTopics(dialogueTopics, { npcs: allNpcs, quests, items: allItems, maps });
 if (dialogueValidationIssues.length) console.warn('Dialogue topic validation issues:', dialogueValidationIssues);
-const itemById = (id: string) => allItems.find(item => item.id === id);
-const cloneItem = (item: ItemDefinition): ItemDefinition => ({ ...item });
-const runtimeItemsByMapId: Record<string, ItemDefinition[]> = Object.fromEntries(Object.values(maps).map(map => [map.id, map.items.map(cloneItem)]));
-function mapItems(mapId: string) { return runtimeItemsByMapId[mapId] ?? (runtimeItemsByMapId[mapId] = []); }
-function currentItems() { return mapItems(currentMap.id); }
-function putItemOnCurrentMap(id: string) {
-  const template = itemById(id); if (!template) return;
-  const items = currentItems();
-  const item = items.find(candidate => candidate.id === id && candidate.done) ?? (() => { const dropped = cloneItem(template); items.push(dropped); return dropped; })();
-  item.done = false;
-  item.x = Math.max(5, Math.min(currentMap.size.w - item.w - 5, player.x + player.w + 18));
-  item.y = Math.max(5, Math.min(currentMap.size.h - item.h - 5, player.y));
-  return item;
-}
+const itemById = worldItems.itemById;
+function currentItems() { return worldItems.itemsForMap(currentMap.id); }
 const inventory = createInventoryHelpers(state.inventory, itemById);
 
 function buildingCollisionRect(building: LocationDefinition): Rect {
@@ -420,7 +410,7 @@ function interact() {
 function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionOpen || checklistUi.isOpen(); }
 function dropLastLargeItem() {
   const id = inventory.lastLargeItemId(); if (!id) { toast('No bulky supply to set down.'); return; }
-  const item = putItemOnCurrentMap(id); if (!item) return;
+  const item = worldItems.dropItemOnMap(id, { mapId: currentMap.id, mapSize: currentMap.size, near: player }); if (!item) return;
   inventory.removeItem(id);
   toast(`${item.inventoryLabel ?? item.label} set down. Your mighty Service Crew arms thank you.`); refreshUI();
 }
