@@ -12,6 +12,7 @@ import { createInventoryHelpers } from './inventory';
 import { createWorldItems } from './worldItems';
 import { createHudUi, type HudUiController } from './hudUi';
 import { createInspectionUi, type InspectionUiController } from './inspectionUi';
+import { canUseAutomaticExit, findAutomaticExit, MAP_TRANSITION_COOLDOWN_SECONDS, resolveMapTransition } from './mapTransitions';
 import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
@@ -378,16 +379,16 @@ function safeStorageGet(key: string) { try { return localStorage.getItem(key); }
 function safeStorageSet(key: string, value: string) { try { localStorage.setItem(key, value); } catch { /* Ignore storage failures; controls keep their in-memory fallback. */ } }
 function award(points: number) { player.points += points; safeStorageSet('campQuestBest', String(Math.max(player.points, Number(safeStorageGet('campQuestBest') || 0)))); }
 function switchMap(exit: InteractableDefinition) {
-  const nextMap = exit.targetMapId ? maps[exit.targetMapId] : undefined;
-  const spawn = nextMap?.spawns.find(({ id }) => id === exit.targetSpawnId);
-  if (!nextMap || !spawn) { toast('That route is not ready yet.'); return; }
-  currentMap = nextMap; player.x = spawn.x; player.y = spawn.y; input.clearMovementInput(); transitionCooldown = .45;
+  const transition = resolveMapTransition(exit, maps);
+  if (!transition) { toast('That route is not ready yet.'); return; }
+  const { nextMap, spawn } = transition;
+  currentMap = nextMap; player.x = spawn.x; player.y = spawn.y; input.clearMovementInput(); transitionCooldown = MAP_TRANSITION_COOLDOWN_SECONDS;
   processQuestEvent({ type: 'mapEntered', mapId: currentMap.id, spawnId: spawn.id });
   scheduleLayoutRecalculation(); toast(`Entered ${currentMap.displayName}`); refreshUI();
 }
 function tryAutomaticExit() {
-  if (transitionCooldown > 0) return false;
-  const exit = currentMap.exits.find(candidate => candidate.activation === 'automatic' && intersects(player, candidate));
+  if (!canUseAutomaticExit(transitionCooldown)) return false;
+  const exit = findAutomaticExit(currentMap, player, intersects);
   if (!exit) return false;
   switchMap(exit); return true;
 }
