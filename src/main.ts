@@ -11,6 +11,7 @@ import { routeWorldInteraction } from './interactionRouter';
 import { createInventoryHelpers } from './inventory';
 import { createWorldItems } from './worldItems';
 import { createHudUi, type HudUiController } from './hudUi';
+import { createInspectionUi, type InspectionUiController } from './inspectionUi';
 import { blockedBridge } from './content/locations';
 import { genericNpcPortrait, npcPortraitPaths } from './content/npcs';
 import { skills } from './content/skills';
@@ -138,7 +139,8 @@ function updateCamera() {
 let input: InputController;
 let checklistUi: ChecklistUiController;
 let hudUi: HudUiController;
-let actionQueued = false, dialogueOpen = false, inspectionOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
+let inspectionUi: InspectionUiController;
+let actionQueued = false, dialogueOpen = false, toastTimer = 0, hazardTick = 0, transitionCooldown = 0;
 let blockedSkillMessageCooldown = 0, lastBlockedTerrainId = '';
 type DialogueUiState = { mode: 'closed' } | { mode: 'choosingTopic'; speaker: DialogueSpeaker; topics: DialogueTopic[]; selectedIndex: number } | { mode: 'showingResponse'; speaker: DialogueSpeaker; topicId?: string; response: string; followUpTopics?: DialogueTopic[]; selectedIndex?: number };
 let dialogueUiState: DialogueUiState = { mode: 'closed' };
@@ -366,13 +368,9 @@ function startNpcDialogue(npc: NPCDefinition) {
   showDialogue(npc, resolveNpcDialogue(npc, result)); refreshUI();
 }
 function inspectImage(title: string, assetId: AssetId, caption: string) {
-  inspectionOpen = true; input.clearMovementInput(); ui.inspectionTitle.textContent = title; ui.inspectionCaption.textContent = caption;
-  ui.inspectionImage.classList.remove('hidden'); ui.inspectionFallback.classList.add('hidden'); ui.inspectionImage.alt = title;
-  ui.inspectionFallback.textContent = `${title} image unavailable`;
-  ui.inspectionImage.onerror = () => { ui.inspectionImage.classList.add('hidden'); ui.inspectionFallback.classList.remove('hidden'); };
-  ui.inspectionImage.src = assets.url(assetId); ui.inspection.classList.remove('hidden');
+  inspectionUi.open(title, assets.url(assetId), caption);
 }
-function closeInspection() { inspectionOpen = false; ui.inspection.classList.add('hidden'); }
+function closeInspection() { inspectionUi.close(); }
 function toast(text: string) { hudUi.showToast(text); toastTimer = 2.8; }
 function dist(a: Rect, b: Rect) { return Math.hypot(a.x + a.w / 2 - b.x - b.w / 2, a.y + a.h / 2 - b.y - b.h / 2); }
 function intersects(a: Rect, b: Rect) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
@@ -394,7 +392,7 @@ function tryAutomaticExit() {
   switchMap(exit); return true;
 }
 function interact() {
-  if (inspectionOpen) { closeInspection(); return; }
+  if (inspectionUi.isOpen()) { closeInspection(); return; }
   if (dialogueOpen) { if (!selectHighlightedTopic()) closeDialogue(); return; }
   routeWorldInteraction({
     currentMap,
@@ -416,7 +414,7 @@ function interact() {
     refreshUI,
   });
 }
-function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionOpen || checklistUi.isOpen(); }
+function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionUi.isOpen() || checklistUi.isOpen(); }
 function dropLastLargeItem() {
   const id = inventory.lastLargeItemId(); if (!id) { toast('No bulky supply to set down.'); return; }
   const item = worldItems.dropItemOnMap(id, { mapId: currentMap.id, mapSize: currentMap.size, near: player }); if (!item) return;
@@ -437,7 +435,7 @@ function update(dt: number) {
   if (gamePhase !== 'playing') return;
   transitionCooldown = Math.max(0, transitionCooldown - dt); blockedSkillMessageCooldown = Math.max(0, blockedSkillMessageCooldown - dt);
   if (actionQueued) { actionQueued = false; interact(); }
-  if (dialogueOpen || inspectionOpen || ui.checklist.classList.contains('open')) { input.resetJoystick(); return; }
+  if (dialogueOpen || inspectionUi.isOpen() || ui.checklist.classList.contains('open')) { input.resetJoystick(); return; }
   const { x, y, magnitude } = input.getMovementVector(); const len = Math.hypot(x, y) || 1;
   const hazard = currentMap.hazards.find(item => intersects(player, item)); const speed = player.speed * magnitude * (hazard && hazard.kind !== 'mosquitoes' ? .55 : 1); move(x / len * speed * dt, y / len * speed * dt);
   if (tryAutomaticExit()) return;
@@ -535,7 +533,7 @@ function drawAboveActors() {
   currentMap.buildings.forEach(drawBuildingSign);
 }
 function drawObjectiveArrow() {
-  if (dialogueOpen || inspectionOpen) return;
+  if (dialogueOpen || inspectionUi.isOpen()) return;
   const task = activeTask();
   const resolved = task && resolveObjectiveTarget(task.objective);
   if (!resolved || resolved.mapId !== currentMap.id) return;
@@ -623,6 +621,16 @@ function startGame() {
 }
 
 let last = performance.now(); function loop(now: number) { const dt = Math.min((now - last) / 1000, .04); last = now; update(dt); if (gamePhase === 'playing' && toastTimer > 0 && (toastTimer -= dt) <= 0) hudUi.hideToast(); draw(); requestAnimationFrame(loop); }
+inspectionUi = createInspectionUi({
+  overlay: ui.inspection,
+  image: ui.inspectionImage,
+  title: ui.inspectionTitle,
+  caption: ui.inspectionCaption,
+  fallback: ui.inspectionFallback,
+  closeButton: document.querySelector('#close-inspection')!,
+}, {
+  onOpen: () => input.clearMovementInput(),
+});
 hudUi = createHudUi({
   objective: ui.objective,
   energy: ui.energy,
@@ -664,7 +672,6 @@ input = createInputController({
 });
 ui.fullscreenButton.addEventListener('click', () => requestGameFullscreen(true));
 document.addEventListener('fullscreenchange', updateFullscreenButtonState);
-document.querySelector('#close-inspection')!.addEventListener('click', closeInspection); ui.inspection.addEventListener('click', event => { if (event.target === ui.inspection) closeInspection(); });
 const checklistButton = document.querySelector<HTMLButtonElement>('#checklist-button')!;
 checklistUi = createChecklistUi({
   elements: {
