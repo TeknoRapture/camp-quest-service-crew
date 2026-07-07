@@ -160,6 +160,20 @@ export function tickCampTime(
   };
 }
 
+export function advanceCampTimeBy(time: CampTimeState, minutes: number): CampTimeState {
+  const safeMinutes = Math.max(0, Math.floor(Number.isFinite(minutes) ? minutes : 0));
+  if (safeMinutes <= 0) return { ...time };
+
+  const currentAbsoluteMinute = (time.dayNumber - 1) * CAMP_MINUTES_PER_DAY + normalizeMinuteOfDay(time.minuteOfDay);
+  const nextAbsoluteMinute = currentAbsoluteMinute + safeMinutes;
+  const dayIndex = Math.floor(nextAbsoluteMinute / CAMP_MINUTES_PER_DAY);
+
+  return {
+    dayNumber: dayIndex + 1,
+    minuteOfDay: normalizeMinuteOfDay(nextAbsoluteMinute),
+  };
+}
+
 export function campTimeAt(hour24: number, minute = 0): number {
   return normalizeMinuteOfDay(hour24 * 60 + minute);
 }
