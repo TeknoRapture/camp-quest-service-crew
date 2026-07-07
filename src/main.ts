@@ -5,6 +5,7 @@ import { dialogue, dialogueTopics } from './content/dialogue';
 import { getValidDialogueTopics, getValidNextDialogueTopics, meaningfulDialogueTopics, topLevelDialogueTopics, validateDialogueTopics, type DialogueContext } from './dialogueEngine';
 import { maps, mainCamp } from './content/maps';
 import { chooseLoadingTip } from './content/loadingTips';
+import { createInitialCampTime, formatCampTime, formatCampWeekDay, getCampCalendarDay } from './campTime';
 import { createChecklistUi, type ChecklistUiController } from './checklistUi';
 import { createInputController, type InputController } from './input';
 import { routeWorldInteraction } from './interactionRouter';
@@ -27,8 +28,9 @@ type GamePhase = 'loading' | 'ready' | 'playing';
 let gamePhase: GamePhase = 'loading';
 let loadingProgress: AssetProgress = { total: 0, settled: 0, loaded: 0, failed: 0 };
 const loadingTip = chooseLoadingTip();
+const campTime = createInitialCampTime();
 const ui = {
-  objective: document.querySelector('#objective')!, energy: document.querySelector<HTMLElement>('#energy-bar')!,
+  objective: document.querySelector('#objective')!, campTime: document.querySelector('#camp-time'), energy: document.querySelector<HTMLElement>('#energy-bar')!,
   points: document.querySelector('#points')!, best: document.querySelector('#best')!, tasks: document.querySelector<HTMLElement>('#tasks')!,
   dialogue: document.querySelector<HTMLElement>('#dialogue')!, speaker: document.querySelector('#speaker')!, text: document.querySelector('#dialogue-text')!,
   portraitPanel: document.querySelector('#portrait-panel')!, portrait: document.querySelector<HTMLImageElement>('#dialogue-portrait')!,
@@ -271,12 +273,15 @@ function resolveObjectiveTarget(task: ObjectiveDefinition) {
 }
 function refreshUI() {
   const lastLargeItemId = inventory.lastLargeItemId();
+  const calendarDay = getCampCalendarDay(campTime);
+  const campTimeText = `${formatCampWeekDay(campTime)} · ${calendarDay.dayOfWeekLabel} · ${formatCampTime(campTime)}`;
   hudUi.refreshHud({
     energy: player.energy,
     points: player.points,
     best: Number(safeStorageGet('campQuestBest') || 0),
     mapDisplayName: currentMap.displayName,
     objective: objective(),
+    campTimeText,
     largeLabels: inventory.visibleLabels('large'),
     trayLabels: inventory.visibleLabels('tray'),
     smallLabels: inventory.visibleLabels('small'),
@@ -634,6 +639,7 @@ inspectionUi = createInspectionUi({
 });
 hudUi = createHudUi({
   objective: ui.objective,
+  campTime: ui.campTime,
   energy: ui.energy,
   points: ui.points,
   best: ui.best,

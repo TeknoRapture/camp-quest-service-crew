@@ -24,7 +24,7 @@
       </section>
       <section class="center-stage">
         <header class="hud">
-          <div class="brand"><span>☀</span><strong>Camp Quest</strong><small>Service Crew</small></div>
+          <div class="brand"><span>☀</span><strong>Camp Quest</strong><small>Service Crew</small><em id="camp-time" class="camp-time">Week 1 / Day 1 · Sunday · 7:00 AM</em></div>
           <div class="meters">
             <div><span>ENERGY</span><div class="energy-track"><i id="energy-bar"></i></div></div>
             <b id="points">0 SP</b><small id="best">BEST 0</small>
@@ -33,6 +33,8 @@
         <section class="objective"><b>NOW:</b> <span id="objective">Talk to Coop</span></section>
         <div class="play-area">
           <canvas id="game" width="960" height="640" aria-label="Camp Quest game map" draggable="false"></canvas>
+          <!-- Manually increment this visible canary for each future mergeable change. -->
+          <p id="version-canary" class="version-canary">v0.0.0.0.1</p>
           <aside id="checklist" class="checklist" aria-hidden="true">
             <button id="close-checklist" aria-label="Close checklist">×</button>
             <h2>Service Checklist</h2><p><strong>Morning Supply Scramble</strong><br />DAY 1 · MAIN CAMP</p><ul id="tasks"></ul><div class="checklist-scroll-controls" aria-label="Checklist scroll controls"><button id="checklist-scroll-up" type="button" aria-label="Scroll checklist up">▲</button><button id="checklist-scroll-down" type="button" aria-label="Scroll checklist down">▼</button></div>
