@@ -1,5 +1,6 @@
 export type HudUiElements = {
   objective: Element;
+  campTime?: Element | null;
   energy: HTMLElement;
   points: Element;
   best: Element;
@@ -14,6 +15,7 @@ export type HudUiState = {
   best: number;
   mapDisplayName: string;
   objective: string;
+  campTimeText?: string;
   largeLabels: string[];
   trayLabels: string[];
   smallLabels: string[];
@@ -34,6 +36,7 @@ export function createHudUi(elements: HudUiElements): HudUiController {
     elements.points.textContent = `${state.points} SP`;
     elements.best.textContent = `BEST ${Math.max(state.best, state.points)}`;
     elements.objective.textContent = `${state.mapDisplayName}: ${state.objective}`;
+    if (elements.campTime) elements.campTime.textContent = state.campTimeText ?? '';
 
     const hands = state.largeLabels.length === 1 && state.lastLargeCarrySize === 2
       ? `${state.largeLabels[0]} (both hands)`

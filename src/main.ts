@@ -5,6 +5,7 @@ import { dialogue, dialogueTopics } from './content/dialogue';
 import { getValidDialogueTopics, getValidNextDialogueTopics, meaningfulDialogueTopics, topLevelDialogueTopics, validateDialogueTopics, type DialogueContext } from './dialogueEngine';
 import { maps, mainCamp } from './content/maps';
 import { chooseLoadingTip } from './content/loadingTips';
+import { createInitialCampTime, formatCampTime, formatCampWeekDay, getCampCalendarDay } from './campTime';
 import { createChecklistUi, type ChecklistUiController } from './checklistUi';
 import { createInputController, type InputController } from './input';
 import { routeWorldInteraction } from './interactionRouter';
@@ -27,8 +28,11 @@ type GamePhase = 'loading' | 'ready' | 'playing';
 let gamePhase: GamePhase = 'loading';
 let loadingProgress: AssetProgress = { total: 0, settled: 0, loaded: 0, failed: 0 };
 const loadingTip = chooseLoadingTip();
+// Manually increment this visible loading/start-screen canary for each future mergeable change.
+const visibleVersionCanary = 'v0.0.0.0.1';
+const campTime = createInitialCampTime();
 const ui = {
-  objective: document.querySelector('#objective')!, energy: document.querySelector<HTMLElement>('#energy-bar')!,
+  objective: document.querySelector('#objective')!, campTime: document.querySelector('#camp-time'), energy: document.querySelector<HTMLElement>('#energy-bar')!,
   points: document.querySelector('#points')!, best: document.querySelector('#best')!, tasks: document.querySelector<HTMLElement>('#tasks')!,
   dialogue: document.querySelector<HTMLElement>('#dialogue')!, speaker: document.querySelector('#speaker')!, text: document.querySelector('#dialogue-text')!,
   portraitPanel: document.querySelector('#portrait-panel')!, portrait: document.querySelector<HTMLImageElement>('#dialogue-portrait')!,
@@ -271,12 +275,15 @@ function resolveObjectiveTarget(task: ObjectiveDefinition) {
 }
 function refreshUI() {
   const lastLargeItemId = inventory.lastLargeItemId();
+  const calendarDay = getCampCalendarDay(campTime);
+  const campTimeText = `${formatCampWeekDay(campTime)} · ${calendarDay.dayOfWeekLabel} · ${formatCampTime(campTime)}`;
   hudUi.refreshHud({
     energy: player.energy,
     points: player.points,
     best: Number(safeStorageGet('campQuestBest') || 0),
     mapDisplayName: currentMap.displayName,
     objective: objective(),
+    campTimeText,
     largeLabels: inventory.visibleLabels('large'),
     trayLabels: inventory.visibleLabels('tray'),
     smallLabels: inventory.visibleLabels('small'),
@@ -577,6 +584,7 @@ function drawTitleScreen() {
   ctx.fillStyle = '#ffd65a'; ctx.fillRect(centerX - 244, 351, 488 * ratio, 18);
   text(gamePhase === 'loading' ? `Loading ${settled}/${total}…` : 'Camp is ready!', centerX, 410, 18);
   text(loadingTip, centerX, 460, 16, '#cde5b1');
+  text(visibleVersionCanary, canvas.width - 86, canvas.height - 42, 14, '#fff3ae');
   if (gamePhase === 'ready') {
     text('Tap to Start', centerX, 530, 28, '#ffd65a');
     text('Press Enter, Space, or Click to Start', centerX, 565, 15, '#fff8df');
@@ -634,6 +642,7 @@ inspectionUi = createInspectionUi({
 });
 hudUi = createHudUi({
   objective: ui.objective,
+  campTime: ui.campTime,
   energy: ui.energy,
   points: ui.points,
   best: ui.best,
