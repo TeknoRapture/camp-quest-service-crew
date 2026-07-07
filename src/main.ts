@@ -5,7 +5,7 @@ import { dialogue, dialogueTopics } from './content/dialogue';
 import { getValidDialogueTopics, getValidNextDialogueTopics, meaningfulDialogueTopics, topLevelDialogueTopics, validateDialogueTopics, type DialogueContext } from './dialogueEngine';
 import { maps, mainCamp } from './content/maps';
 import { chooseLoadingTip } from './content/loadingTips';
-import { createInitialCampTime, formatCampTime, formatCampWeekDay, getCampCalendarDay } from './campTime';
+import { advanceCampTimeBy, CAMP_MINUTES_PER_DAY, createInitialCampTime, formatCampTime, formatCampWeekDay, getCampCalendarDay, type CampTimeState } from './campTime';
 import { createChecklistUi, type ChecklistUiController } from './checklistUi';
 import { createInputController, type InputController } from './input';
 import { routeWorldInteraction } from './interactionRouter';
@@ -24,13 +24,15 @@ import type { DialogueEffect, DialogueSpeaker, DialogueTopic, InteractableDefini
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
 // Manually increment this visible canary for each future mergeable change.
-const visibleVersionCanary = 'v0.0.0.0.1';
+const visibleVersionCanary = 'v0.0.0.0.2';
 const assets = new AssetLoader();
 type GamePhase = 'loading' | 'ready' | 'playing';
 let gamePhase: GamePhase = 'loading';
 let loadingProgress: AssetProgress = { total: 0, settled: 0, loaded: 0, failed: 0 };
 const loadingTip = chooseLoadingTip();
-const campTime = createInitialCampTime();
+const RUNTIME_CAMP_TIME_ACCELERATION = 0.25;
+let campTime = createInitialCampTime();
+let pendingCampMinutes = 0;
 const ui = {
   objective: document.querySelector('#objective')!, campTime: document.querySelector('#camp-time'), energy: document.querySelector<HTMLElement>('#energy-bar')!,
   points: document.querySelector('#points')!, best: document.querySelector('#best')!, tasks: document.querySelector<HTMLElement>('#tasks')!,
@@ -422,7 +424,22 @@ function interact() {
     refreshUI,
   });
 }
-function controlsBlocked() { return gamePhase !== 'playing' || dialogueOpen || inspectionUi.isOpen() || checklistUi.isOpen(); }
+function isBlockingModalOpen() { return dialogueOpen || inspectionUi.isOpen() || checklistUi.isOpen(); }
+function isActiveGameplayTime() { return gamePhase === 'playing' && !isBlockingModalOpen() && !document.hidden; }
+function getCampTimeDisplayKey(time: CampTimeState) { return (time.dayNumber - 1) * CAMP_MINUTES_PER_DAY + time.minuteOfDay; }
+function updateCampTime(dt: number) {
+  if (!isActiveGameplayTime()) return;
+  pendingCampMinutes += dt * RUNTIME_CAMP_TIME_ACCELERATION;
+  const wholeMinutes = Math.floor(pendingCampMinutes);
+  if (wholeMinutes <= 0) return;
+
+  pendingCampMinutes -= wholeMinutes;
+  const previousDisplayKey = getCampTimeDisplayKey(campTime);
+  campTime = advanceCampTimeBy(campTime, wholeMinutes);
+  const nextDisplayKey = getCampTimeDisplayKey(campTime);
+  if (nextDisplayKey !== previousDisplayKey) refreshUI();
+}
+function controlsBlocked() { return gamePhase !== 'playing' || isBlockingModalOpen(); }
 function dropLastLargeItem() {
   const id = inventory.lastLargeItemId(); if (!id) { toast('No bulky supply to set down.'); return; }
   const item = worldItems.dropItemOnMap(id, { mapId: currentMap.id, mapSize: currentMap.size, near: player }); if (!item) return;
@@ -443,7 +460,8 @@ function update(dt: number) {
   if (gamePhase !== 'playing') return;
   transitionCooldown = Math.max(0, transitionCooldown - dt); blockedSkillMessageCooldown = Math.max(0, blockedSkillMessageCooldown - dt);
   if (actionQueued) { actionQueued = false; interact(); }
-  if (dialogueOpen || inspectionUi.isOpen() || ui.checklist.classList.contains('open')) { input.resetJoystick(); return; }
+  if (isBlockingModalOpen()) { input.resetJoystick(); return; }
+  updateCampTime(dt);
   const { x, y, magnitude } = input.getMovementVector(); const len = Math.hypot(x, y) || 1;
   const hazard = currentMap.hazards.find(item => intersects(player, item)); const speed = player.speed * magnitude * (hazard && hazard.kind !== 'mosquitoes' ? .55 : 1); move(x / len * speed * dt, y / len * speed * dt);
   if (tryAutomaticExit()) return;
@@ -679,6 +697,10 @@ input = createInputController({
   onDialogueSelect: selectHighlightedTopic,
   onDialogueClose: closeDialogue,
   onLayoutMayNeedUpdate: scheduleLayoutRecalculation,
+});
+document.addEventListener('visibilitychange', () => {
+  last = performance.now();
+  if (document.hidden) input.clearMovementInput();
 });
 ui.fullscreenButton.addEventListener('click', () => requestGameFullscreen(true));
 document.addEventListener('fullscreenchange', updateFullscreenButtonState);
