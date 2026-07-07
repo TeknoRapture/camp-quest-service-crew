@@ -23,6 +23,8 @@ import type { DialogueEffect, DialogueSpeaker, DialogueTopic, InteractableDefini
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d')!;
+// Manually increment this visible canary for each future mergeable change.
+const visibleVersionCanary = 'v0.0.0.0.1';
 const assets = new AssetLoader();
 type GamePhase = 'loading' | 'ready' | 'playing';
 let gamePhase: GamePhase = 'loading';
@@ -582,6 +584,7 @@ function drawTitleScreen() {
   ctx.fillStyle = '#ffd65a'; ctx.fillRect(centerX - 244, 351, 488 * ratio, 18);
   text(gamePhase === 'loading' ? `Loading ${settled}/${total}…` : 'Camp is ready!', centerX, 410, 18);
   text(loadingTip, centerX, 460, 16, '#cde5b1');
+  text(visibleVersionCanary, centerX, 615, 14, '#fff3ae');
   if (gamePhase === 'ready') {
     text('Tap to Start', centerX, 530, 28, '#ffd65a');
     text('Press Enter, Space, or Click to Start', centerX, 565, 15, '#fff8df');
